@@ -1,0 +1,285 @@
+//@version=5
+indicator("EzTrades NY Strategy - SMT + IFVG + DOL", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── SMT Divergence ──
+grp_smt    = "══════ SMT Divergence ══════"
+smt_on     = input.bool(true, "Enable SMT", group=grp_smt)
+smt_len    = input.int(3, "Swing Lookback", minval=2, maxval=10, group=grp_smt, tooltip="Swing detection strength")
+smt_bull_c = input.color(color.new(#00E676, 0), "Bullish SMT", group=grp_smt)
+smt_bear_c = input.color(color.new(#FF1744, 0), "Bearish SMT", group=grp_smt)
+
+// ── FVG HTF ──
+grp_fvg    = "══════ Fair Value Gaps ══════"
+fvg_15m    = input.bool(true, "Show 15m FVG", group=grp_fvg)
+fvg_1h     = input.bool(true, "Show 1h FVG", group=grp_fvg)
+fvg_daily  = input.bool(true, "Show Daily FVG", group=grp_fvg)
+fvg_bull_c = input.color(color.new(#4CAF50, 80), "Bullish FVG", group=grp_fvg)
+fvg_bear_c = input.color(color.new(#f44336, 80), "Bearish FVG", group=grp_fvg)
+
+// ── IFVG Entry ──
+grp_ifvg   = "══════ Inverse FVG (Entry) ══════"
+ifvg_on    = input.bool(true, "Detect IFVG", group=grp_ifvg)
+ifvg_tf    = input.timeframe("1", "Entry Timeframe", group=grp_ifvg, tooltip="Lower TF for IFVG detection")
+ifvg_bull_c= input.color(color.new(#00E676, 20), "Bullish IFVG", group=grp_ifvg)
+ifvg_bear_c= input.color(color.new(#FF1744, 20), "Bearish IFVG", group=grp_ifvg)
+
+// ── Sessions ──
+grp_sess   = "══════ Sessions ══════"
+show_ny    = input.bool(true, "Show NY Session", group=grp_sess)
+show_asia  = input.bool(true, "Show Asia (prev)", group=grp_sess)
+show_lon   = input.bool(true, "Show London (prev)", group=grp_sess)
+ny_c       = input.color(color.new(#FFD600, 50), "NY Color", group=grp_sess)
+asia_c     = input.color(color.new(#FF9800, 60), "Asia Color", group=grp_sess)
+lon_c      = input.color(color.new(#2196F3, 60), "London Color", group=grp_sess)
+
+// ── Alerts ──
+grp_alert  = "══════ Alerts ══════"
+alert_smt  = input.bool(true, "Alert SMT", group=grp_alert)
+alert_ifvg = input.bool(true, "Alert IFVG", group=grp_alert)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SESSION TRACKING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// UTC session times: Asia 20:00-00:00, London 07:00-10:00, NY 13:30-20:00
+is_asia   = not na(time(timeframe.period, "2000-0000", "UTC"))
+is_london = not na(time(timeframe.period, "0700-1000", "UTC"))
+is_ny     = not na(time(timeframe.period, "1330-2000", "UTC"))
+
+// Current session tracking
+var float a_hi = na, var float a_lo = na
+var float l_hi = na, var float l_lo = na
+var float n_hi = na, var float n_lo = na
+
+// Previous session values
+var float pa_hi = na, var float pa_lo = na
+var float pl_hi = na, var float pl_lo = na
+
+if is_asia
+    a_hi := na(a_hi) ? high : math.max(a_hi, high)
+    a_lo := na(a_lo) ? low  : math.min(a_lo, low)
+
+if is_london
+    l_hi := na(l_hi) ? high : math.max(l_hi, high)
+    l_lo := na(l_lo) ? low  : math.min(l_lo, low)
+
+if is_ny
+    n_hi := na(n_hi) ? high : math.max(n_hi, high)
+    n_lo := na(n_lo) ? low  : math.min(n_lo, low)
+
+new_day = ta.change(time("D")) != 0
+if new_day
+    pa_hi := a_hi
+    pa_lo := a_lo
+    pl_hi := l_hi
+    pl_lo := l_lo
+    a_hi := na, a_lo := na
+    l_hi := na, l_lo := na
+    n_hi := na, n_lo := na
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SMT DIVERGENCE (MNQ vs ES)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Swing detection on current chart (MNQ)
+ph = ta.pivothigh(high, smt_len, smt_len)
+pl_s = ta.pivotlow(low, smt_len, smt_len)
+
+// Swing detection on ES
+ph_es = request.security("CME_MINI:ES1!", timeframe.period, ta.pivothigh(high, smt_len, smt_len))
+pl_es = request.security("CME_MINI:ES1!", timeframe.period, ta.pivotlow(low, smt_len, smt_len))
+
+// Previous swings for comparison
+var float prev_mnq_ph = na
+var float prev_mnq_pl = na
+var float prev_es_ph  = na
+var float prev_es_pl  = na
+
+if not na(ph)
+    prev_mnq_ph := ph
+if not na(pl_s)
+    prev_mnq_pl := pl_s
+if not na(ph_es)
+    prev_es_ph := ph_es
+if not na(pl_es)
+    prev_es_pl := pl_es
+
+// SMT Bullish: ES made lower low, MNQ made higher low
+smt_bull = smt_on and not na(pl_s) and not na(pl_es) and not na(prev_mnq_pl) and not na(prev_es_pl) and pl_s > prev_mnq_pl and pl_es < prev_es_pl
+
+// SMT Bearish: ES made higher high, MNQ made lower high
+smt_bear = smt_on and not na(ph) and not na(ph_es) and not na(prev_mnq_ph) and not na(prev_es_ph) and ph < prev_mnq_ph and ph_es > prev_es_ph
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FVG DETECTION (15m, 1h, Daily)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Helper function for FVG detection
+fvg_detect(tf) =>
+    o2 = request.security(syminfo.tickerid, tf, open[2])
+    h2 = request.security(syminfo.tickerid, tf, high[2])
+    l0 = request.security(syminfo.tickerid, tf, low[0])
+    c1 = request.security(syminfo.tickerid, tf, close[1])
+    o1 = request.security(syminfo.tickerid, tf, open[1])
+    h0 = request.security(syminfo.tickerid, tf, high[0])
+    l2 = request.security(syminfo.tickerid, tf, low[2])
+    
+    bull = c1 > o1 and l0 > h2  // Bullish: green candle, gap up
+    bear = c1 < o1 and h0 < l2  // Bearish: red candle, gap down
+    
+    bull_top = bull ? l0 : na
+    bull_bot = bull ? h2 : na
+    bear_top = bear ? h0 : na
+    bear_bot = bear ? l2 : na
+    
+    [bull, bear, bull_top, bull_bot, bear_top, bear_bot]
+
+// 15m FVG
+[fvg15_bull, fvg15_bear, fvg15_bull_top, fvg15_bull_bot, fvg15_bear_top, fvg15_bear_bot] = fvg_detect("15")
+
+// 1h FVG
+[fvg1h_bull, fvg1h_bear, fvg1h_bull_top, fvg1h_bull_bot, fvg1h_bear_top, fvg1h_bear_bot] = fvg_detect("60")
+
+// Daily FVG
+[fvgD_bull, fvgD_bear, fvgD_bull_top, fvgD_bull_bot, fvgD_bear_top, fvgD_bear_bot] = fvg_detect("D")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INVERSE FVG (IFVG) - Entry Model
+// ══════════════════════════════════════════════════════════════════════════════
+
+// IFVG: V-shape reversal that closes back through a FVG
+// Bullish IFVG: price goes below a bearish FVG then closes back above
+// Bearish IFVG: price goes above a bullish FVG then closes back below
+
+// Detect recent FVGs on lower timeframe
+ifvg_o2 = request.security(syminfo.tickerid, ifvg_tf, open[2])
+ifvg_h2 = request.security(syminfo.tickerid, ifvg_tf, high[2])
+ifvg_l0 = request.security(syminfo.tickerid, ifvg_tf, low[0])
+ifvg_c1 = request.security(syminfo.tickerid, ifvg_tf, close[1])
+ifvg_o1 = request.security(syminfo.tickerid, ifvg_tf, open[1])
+ifvg_h0 = request.security(syminfo.tickerid, ifvg_tf, high[0])
+ifvg_l2 = request.security(syminfo.tickerid, ifvg_tf, low[2])
+ifvg_c  = request.security(syminfo.tickerid, ifvg_tf, close)
+ifvg_h  = request.security(syminfo.tickerid, ifvg_tf, high)
+
+// Bullish IFVG: candle closes above a bearish FVG that was just swept
+ifvg_bull = ifvg_on and ifvg_c1 < ifvg_o1 and ifvg_c > ifvg_h0 and ifvg_h0 < ifvg_l2
+
+// Bearish IFVG: candle closes below a bullish FVG that was just swept
+ifvg_bear = ifvg_on and ifvg_c1 > ifvg_o1 and ifvg_c < ifvg_l0 and ifvg_l0 > ifvg_h2
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SESSION ZONES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// NY session background
+ny_start = not na(time(timeframe.period, "1330-2000", "UTC"))
+bgcolor(ny_start and show_ny ? color.new(ny_c, 90) : na)
+
+// Session lines
+plot(show_asia and not na(pa_hi) ? pa_hi : na, "Prev Asia High", asia_c, 1, plot.style_linebr)
+plot(show_asia and not na(pa_lo) ? pa_lo : na, "Prev Asia Low",  asia_c, 1, plot.style_linebr)
+plot(show_lon  and not na(pl_hi) ? pl_hi : na, "Prev Lon High",  lon_c,  1, plot.style_linebr)
+plot(show_lon  and not na(pl_lo) ? pl_lo : na, "Prev Lon Low",   lon_c,  1, plot.style_linebr)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DRAW ON LIQUIDITY (DOL) Detection
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Equal highs/lows detection
+swing_hi = ta.pivothigh(high, 5, 5)
+swing_lo = ta.pivotlow(low, 5, 5)
+
+var float last_sh = na
+var float last_sh2 = na
+var float last_sl = na
+var float last_sl2 = na
+
+if not na(swing_hi)
+    last_sh2 := last_sh
+    last_sh := swing_hi
+
+if not na(swing_lo)
+    last_sl2 := last_sl
+    last_sl := swing_lo
+
+// Equal highs (within 0.1% tolerance)
+tol = 0.001
+eq_highs = not na(last_sh) and not na(last_sh2) and math.abs(last_sh - last_sh2) / last_sh < tol
+eq_lows  = not na(last_sl) and not na(last_sl2) and math.abs(last_sl - last_sl2) / last_sl < tol
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PLOTTING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// SMT markers
+plotshape(smt_bull, "SMT Bull", shape.triangleup,   location.belowbar, smt_bull_c, size=size.small, text="SMT")
+plotshape(smt_bear, "SMT Bear", shape.triangledown,  location.abovebar, smt_bear_c, size=size.small, text="SMT")
+
+// IFVG markers
+plotshape(ifvg_bull, "IFVG Bull", shape.labelup,   location.belowbar, ifvg_bull_c, size=size.tiny, text="IFVG")
+plotshape(ifvg_bear, "IFVG Bear", shape.labeldown,  location.abovebar, ifvg_bear_c, size=size.tiny, text="IFVG")
+
+// FVG boxes
+var box fvg15_bull_box = na, var box fvg15_bear_box = na
+var box fvg1h_bull_box = na, var box fvg1h_bear_box = na
+var box fvgD_bull_box  = na, var box fvgD_bear_box  = na
+
+// 15m FVG
+if fvg_15m and fvg15_bull
+    fvg15_bull_box := box.new(bar_index - 2, fvg15_bull_top, bar_index + 10, fvg15_bull_bot, bgcolor=fvg_bull_c, border_color=color.new(color.green, 60))
+if fvg_15m and fvg15_bear
+    fvg15_bear_box := box.new(bar_index - 2, fvg15_bear_top, bar_index + 10, fvg15_bear_bot, bgcolor=fvg_bear_c, border_color=color.new(color.red, 60))
+
+// 1h FVG
+if fvg_1h and fvg1h_bull
+    fvg1h_bull_box := box.new(bar_index - 2, fvg1h_bull_top, bar_index + 20, fvg1h_bull_bot, bgcolor=fvg_bull_c, border_color=color.new(color.green, 50), border_width=2)
+if fvg_1h and fvg1h_bear
+    fvg1h_bear_box := box.new(bar_index - 2, fvg1h_bear_top, bar_index + 20, fvg1h_bear_bot, bgcolor=fvg_bear_c, border_color=color.new(color.red, 50), border_width=2)
+
+// Daily FVG
+if fvg_daily and fvgD_bull
+    fvgD_bull_box := box.new(bar_index - 2, fvgD_bull_top, bar_index + 40, fvgD_bull_bot, bgcolor=fvg_bull_c, border_color=color.new(color.green, 40), border_width=3)
+if fvg_daily and fvgD_bear
+    fvgD_bear_box := box.new(bar_index - 2, fvgD_bear_top, bar_index + 40, fvgD_bear_bot, bgcolor=fvg_bear_c, border_color=color.new(color.red, 40), border_width=3)
+
+// Equal highs/lows labels
+if eq_highs and barstate.isconfirmed
+    label.new(bar_index, last_sh, "EQ H", style=label.style_label_down, color=color.new(color.red, 50), textcolor=color.white, size=size.tiny)
+if eq_lows and barstate.isconfirmed
+    label.new(bar_index, last_sl, "EQ L", style=label.style_label_up, color=color.new(color.green, 50), textcolor=color.white, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALERTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(smt_bull and alert_smt,  "SMT Bullish", "🟢 Bullish SMT Divergence - MNQ higher low, ES lower low")
+alertcondition(smt_bear and alert_smt,  "SMT Bearish", "🔴 Bearish SMT Divergence - MNQ lower high, ES higher high")
+alertcondition(ifvg_bull and alert_ifvg, "IFVG Bullish", "🟢 Bullish IFVG - V-shape reversal entry")
+alertcondition(ifvg_bear and alert_ifvg, "IFVG Bearish", "🔴 Bearish IFVG - V-shape reversal entry")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INFO TABLE
+// ══════════════════════════════════════════════════════════════════════════════
+
+var t = table.new(position.top_right, 2, 7, bgcolor=color.new(#1a1a2e, 10), border_color=color.gray, border_width=1)
+
+if barstate.islast
+    table.cell(t, 0, 0, "SMT",   text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 0, smt_on ? "ON" : "OFF", text_color=smt_on ? color.green : color.gray, text_size=size.small)
+    table.cell(t, 0, 1, "15m",   text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 1, fvg_15m ? "ON" : "OFF", text_color=fvg_15m ? color.green : color.gray, text_size=size.small)
+    table.cell(t, 0, 2, "1h",    text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 2, fvg_1h ? "ON" : "OFF", text_color=fvg_1h ? color.green : color.gray, text_size=size.small)
+    table.cell(t, 0, 3, "Daily", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 3, fvg_daily ? "ON" : "OFF", text_color=fvg_daily ? color.green : color.gray, text_size=size.small)
+    table.cell(t, 0, 4, "IFVG",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 4, ifvg_on ? ifvg_tf : "OFF", text_color=ifvg_on ? color.green : color.gray, text_size=size.small)
+    table.cell(t, 0, 5, "Asia",  text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 5, not na(pa_hi) ? str.tostring(pa_hi,"#.##")+" / "+str.tostring(pa_lo,"#.##") : "-", text_color=color.orange, text_size=size.small)
+    table.cell(t, 0, 6, "London", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 6, not na(pl_hi) ? str.tostring(pl_hi,"#.##")+" / "+str.tostring(pl_lo,"#.##") : "-", text_color=color.blue, text_size=size.small)
