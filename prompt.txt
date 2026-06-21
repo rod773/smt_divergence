@@ -1,0 +1,68 @@
+Crea un indicador en Pine Script v5 para TradingView con las siguientes especificaciones basadas en la estrategia EzTrades de trading en la sesión de Nueva York:
+
+## Componentes requeridos:
+
+### 1. SMT Divergence (Smart Money Technique)
+- Comparar swing highs/lows entre MNQ (chart actual) y ES (proxy de MES)
+- Detección de swings con pivot high/low configurable (default 3)
+- Bullish SMT: ES hace lower low, MNQ hace higher low
+- Bearish SMT: ES hace higher high, MNQ hace lower high
+- Usar request.security("CME_MINI:ES1!", ...) para obtener datos de ES
+- Marcar con triángulos cuando hay divergencia
+
+### 2. Fair Value Gaps (FVG) - Higher Timeframe
+- Detectar FVG en múltiples timeframes: 15min, 1h, Daily
+- Bullish FVG: vela [1] alcista, low[0] > high[2] (gap entre candle[2] high y candle[0] low)
+- Bearish FVG: vela [1] bajista, high[0] < low[2] (gap entre candle[0] high y candle[2] low)
+- Dibujar como cajas (boxes) con colores configurables
+- Usar request.security para obtener datos de cada TF
+
+### 3. Inverse Fair Value Gap (IFVG) - Modelo de Entrada
+- Detectar en timeframe bajo (default 1min)
+- Bullish IFVG: precio cierra por encima de un bearish FVG que fue barrido (V-shape reversal)
+- Bearish IFVG: precio cierra por debajo de un bullish FVG que fue barrido
+- Marcar con labels cuando se detecta
+
+### 4. Draws on Liquidity (DOL)
+- Detectar equal highs/lows automáticamente (con tolerancia de 0.1%)
+- Mostrar labels "EQ H" y "EQ L"
+- Almacenar high/low de sesiones anteriores
+
+### 5. Sessions
+- Asia: 20:00-00:00 UTC (color naranja)
+- London: 07:00-10:00 UTC (color azul)
+- NY: 13:30-20:00 UTC (color amarillo, con fondo)
+- Guardar high/low de sesiones anteriores para referencia
+- Resetear valores al inicio de cada día
+
+## Inputs configurables:
+- Toggle para cada componente (SMT, FVG por TF, IFVG, Sessions)
+- Colores para cada elemento
+- Swing lookback para SMT
+- Timeframe para IFVG
+- Alertas para SMT e IFVG
+
+## PLOTS:
+- Session lines (Asia prev, London prev)
+- SMT markers (triángulos)
+- IFVG markers (labels)
+- FVG boxes (15m, 1h, Daily)
+- Equal highs/lows labels
+- Background color para NY session
+
+## ALERTS:
+- SMT Bullish/Bearish
+- IFVG Bullish/Bearish
+
+## INFO TABLE:
+- Tabla en esquina superior derecha mostrando estado de cada componente
+
+## Restricciones:
+- Usar max_boxes_count=500, max_lines_count=500, max_labels_count=500
+-.overlay=true
+- No usar bibliotecas externas
+- Todo el código en un solo archivo .pine
+
+## Archivo de referencia:
+La estrategia completa está documentada en el video: https://youtu.be/6nVq3RVGQFw
+Los componentes principales son: SMT divergence entre MNQ y ES, FVG de higher timeframe, Inverse FVG como entrada, y detección de liquidity sweeps de sesiones anteriores.
