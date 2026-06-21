@@ -1,73 +1,171 @@
-# EzTrades NY Strategy - Pine Script Indicator
+# ManipulationX V.6 - Pine Script Indicator
 
-Indicador basado en la estrategia del canal **EzTrades** para operar la sesión de Nueva York con un 76% de win rate mecánico.
+Réplica del indicador **ManipulationX V.6** utilizado por **EzTrades** en su estrategia de trading para la sesión de Nueva York.
 
 ## Referencia
 
 - **Video**: [How I Get A 76% Win-Rate Trading NY Session (90% Mechanical)](https://youtu.be/6nVq3RVGQFw)
 - **Canal**: EzTrades
+- **Indicador original**: ManipulationX V.6 (disponible en la descripción del video)
+
+---
+
+## Archivos del Proyecto
+
+| Archivo | Descripción |
+|---------|-------------|
+| `ManipulationX_V6.pine` | Indicador principal para TradingView |
+| `prompt.txt` | Prompt para recrear el indicador con IA |
+| `How I Get A 76 Mechanical...txt` | Subtítulos del video |
+| `frames/` | Frames extraídos del video para análisis |
 
 ---
 
 ## Componentes del Indicador
 
-### 1. SMT Divergence (Smart Money Technique)
+### 1. HTF Fair Value Gaps (FVG)
 
-La divergencia SMT ocurre cuando dos activos correlacionados (MNQ y MES/ES) muestran movimientos opuestos en sus swing points.
+Los FVG son zonas de desequilibrio donde el precio dejó un "gap" entre velas. Se muestran como **cajas grises** que se extienden hasta el borde derecho del chart.
 
-**Reglas:**
-- **Bullish SMT**: ES hace un lower low mientras MNQ hace un higher low → Señal alcista
-- **Bearish SMT**: ES hace un higher high mientras MNQ hace un lower high → Señal bajista
+| TF | Configuración default | Max FVGs |
+|----|----------------------|----------|
+| 1 hour | ON | 3 |
+| 15 min | ON | 6 |
 
-**Cómo funciona:**
-- Detecta swing highs y lows en ambos mercados
-- Compara la dirección de los últimos swings
-- Marca con triángulo cuando hay divergencia
+**Visual:**
+- Cajas grises semi-transparentes (`#b0b0b0`)
+- Labels "1H FVG" y "15M FVG" al final del box
+- Se extienden automáticamente (`extend=extend.right`)
 
-### 2. Fair Value Gaps (FVG)
+**Detección:**
+- **Bullish FVG**: Vela [1] alcista, `low[0] > high[2]`
+- **Bearish FVG**: Vela [1] bajista, `high[0] < low[2]`
 
-Los FVG son zonas de desequilibrio donde el precio dejó un "gap" entre velas.
+### 2. Inverse Fair Value Gap (IFVG)
 
-**Timeframes soportados:**
-| TF | Uso |
-|----|-----|
-| 15min | Entry zone,delivery primario |
-| 1h | Contexto de sesión |
-| 1h+ | Dirección mayor |
+Modelo de entrada principal. Ocurre cuando el precio "invierte" un FVG existente con un V-shape reversal.
 
-**Tipos:**
-- **Bullish FVG**: Vela alcista grande que deja gap entre candle[2] high y candle[0] low
-- **Bearish FVG**: Vela bajista grande que deja gap entre candle[0] high y candle[2] low
+**Visual:**
+- Línea sólida horizontal (configurable: Solid/Dashed/Dotted)
+- Zona gris pequeña marca el IFVG
+- Label "IFVG" con color (verde=bull, rojo=bear)
 
-### 3. Inverse Fair Value Gap (IFVG) - Modelo de Entrada
+**Detección:**
+- **Bullish IFVG**: `close[1] < open[1]` y `close > high[0]` (cierra sobre bearish FVG)
+- **Bearish IFVG**: `close[1] > open[1]` y `close < low[0]` (cierra bajo bullish FVG)
 
-El IFVG es el trigger de entrada. Ocurre cuando el precio "invierte" un FVG existente.
+**Settings del video:**
+- Source: Chart
+- Line Style: Solid
+- Line Width: 1
+- Minimum Size: 1
+- Size Filter: ON
 
-**Reglas:**
-- **Bullish IFVG**: Precio cierra por encima de un bearish FVG que fue barrido
-- **Bearish IFVG**: Precio cierra por debajo de un bullish FVG que fue barrido
+### 3. SMT Divergence (Smart Money Technique)
 
-**Confirmación:** V-shape reversal con cierre fuerte sobre/bajo el FVG
+Divergencia entre MNQ y ES (proxy de MES). Uno hace higher high/low mientras el otro hace lower low/high.
 
-### 4. Draws on Liquidity (DOL)
+**Visual:**
+- Label "SMT" pequeño cerca del swing point
+- Verde = Bullish SMT
+- Rojo = Bearish SMT
 
-Niveles que el precio quiere alcanzar.
+**Detección:**
+- **Bullish SMT**: ES hace lower low, MNQ hace higher low
+- **Bearish SMT**: ES hace higher high, MNQ hace lower high
+- Swing lookback configurable (default: 3)
 
-**Detecta automáticamente:**
-- Equal highs/lows (máximas/mínimas iguales)
-- Liquidity de sesiones anteriores (Asia, London)
+### 4. Entry Markers (Continuation/Reversal)
 
-### 5. Sessions
+**Visual:**
+- **"C"** (Continuation): Cuadrado negro con texto blanco
+- **"R"** (Reversal): Cuadrado verde (bull) o rojo (bear) con texto blanco
 
-| Sesión | Horario (UTC) | Color |
-|--------|---------------|-------|
-| Asia | 20:00 - 00:00 | Naranja |
-| London | 07:00 - 10:00 | Azul |
-| NY | 13:30 - 20:00 | Amarillo |
+**Detección:**
+- Continuation: Misma dirección que la tendencia actual
+- Reversal: Patrón V-shape (cierra más allá del candle anterior)
+
+### 5. Liquidity (Equal Highs/Lows)
+
+**Visual:**
+- Línea horizontal dashed gris
+- Label "$$$" al final
+
+**Detección:**
+- Equal highs/lows con tolerancia de 0.1%
+- Basado en pivot high/low con lookback de 5
+
+### 6. Killzones (Opcional)
+
+| Zona | Horario | Color |
+|------|---------|-------|
+| New York | 09:30 - 11:00 ET | Amarillo |
+| London | 02:30 - 04:00 ET | Azul |
+| Custom | 09:30 - 23:00 ET | Púrpura |
 
 ---
 
-## Checklist de la Estrategia (del video)
+## Configuración en TradingView
+
+### Paso 1: Preparar el chart
+1. Abre TradingView
+2. Busca `CME_MINI:MNQ1!` (Nasdaq futures)
+3. Selecciona timeframe de 1min, 3min o 5min para entries
+
+### Paso 2: Agregar el indicador
+1. Ve a **Pine Editor** (parte inferior)
+2. Haz clic en **Open** → **New indicator**
+3. Copia el contenido completo de `ManipulationX_V6.pine`
+4. Haz clic en **Add to chart**
+
+### Paso 3: Configurar (según el video)
+```
+Entries:
+  ✓ Continuations (C)
+  ✓ Reversals (R)
+
+Killzones:
+  ☐ Use Killzones (desactivado por defecto)
+
+IFVG:
+  ✓ Show IFVGs
+  Source: Chart
+  Line Style: Solid
+  Line Width: 1
+  Minimum Size: 1
+  ✓ Size Filter
+
+HTF FVG:
+  ✓ Show Internal Liquidity (FVG) - 1 hour
+  ✓ Show Text
+  ☐ Extend FVG
+  Max FVGs: 3
+
+  ✓ Show Internal Liquidity (FVG) - 15 min
+  ✓ Show Text
+  ☐ Extend FVG
+  Max FVGs: 6
+
+SMT Divergence:
+  ✓ Show SMT
+  Swing Lookback: 3
+
+Liquidity:
+  ✓ Show Liquidity
+```
+
+### Paso 4: Alerts
+1. Haz clic en el indicador en el chart
+2. Ve a **Alerts** → **Add Alert**
+3. Condiciones disponibles:
+   - `IFVG Bullish` / `IFVG Bearish`
+   - `SMT Bullish` / `SMT Bearish`
+
+---
+
+## Estrategia Completa (del video)
+
+### Checklist de la Estrategia
 
 ```
 1. □ Esperar apertura NY (9:30 AM ET / 13:30 UTC)
@@ -82,37 +180,7 @@ Niveles que el precio quiere alcanzar.
 10. □ Target: DOL (equal highs/lows, London H/L)
 ```
 
----
-
-## Configuración en TradingView
-
-### Paso 1: Preparar el chart
-1. Abre TradingView
-2. Busca `CME_MINI:MNQ1!` (Nasdaq futures)
-3. Selecciona timeframe de 1min o 3min para entries
-
-### Paso 2: Agregar el indicador
-1. Ve a **Pine Editor** (parte inferior)
-2. Haz clic en **Open** → **New indicator**
-3. Copia el contenido de `EzTrades_NY_Strategy.pine`
-4. Haz clic en **Add to chart**
-
-### Paso 3: Configurar
-- Activa **SMT** para ver divergencias con ES
-- Activa **15m** y **1h FVG** para contexto
-- Configura **IFVG** en timeframe de entrada (1min)
-- Activa alerts para notificaciones
-
-### Paso 4: Alerts
-1. Haz clic en el indicador en el chart
-2. Ve a **Alerts** → **Add Alert**
-3. Selecciona las condiciones:
-   - `SMT Bullish` / `SMT Bearish`
-   - `IFVG Bullish` / `IFVG Bearish`
-
----
-
-## Ejemplo de Setup A+
+### Ejemplo de Setup A+
 
 ```
 1. NY abre a 13:30 UTC
@@ -127,27 +195,22 @@ Niveles que el precio quiere alcanzar.
 10. TP: Equal highs / London high
 ```
 
----
+### Macro Window
 
-## Archivos
-
-| Archivo | Descripción |
-|---------|-------------|
-| `EzTrades_NY_Strategy.pine` | Indicador principal (copia para TradingView) |
-| `How I Get A 76 Mechanical...txt` | Subtítulos del video de referencia |
+El video menciona que el **9:50-10:00 AM ET** es una ventana clave para reversal/volumen.
 
 ---
 
 ## Notas Importantes
 
-- **Ticker**: El indicador usa `CME_MINI:ES1!` como proxy de MES para el SMT. Si necesitas otro ticker, edita las líneas de `request.security`
-- **Timeframes**: Puedes ajustar los TF de FVG en los inputs
-- **No es señal automática**: Es una herramienta de análisis. Siempre confirma la estructura del mercado
-- **Gestión de riesgo**: El video recomienda BE rápido y targets conservadores (base hits, no 1:5)
+- **Ticker**: El indicador usa `CME_MINI:ES1!` como proxy de MES para el SMT
+- **No es señal automática**: Es una herramienta de análisis. Siempre confirma la estructura
+- **Gestión de riesgo**: El video recomienda BE rápido y targets conservadores (base hits)
+- **Timeframes**: Usa 1min/3min para entries, 15min/1h para contexto
 
 ---
 
 ## Créditos
 
-- **Estrategia original**: EzTrades
-- **Indicador**: Generado con asistencia de IA
+- **Estrategia original**: EzTrades (ManipulationX V.6)
+- **Indicador**: Réplica generada con análisis de video
