@@ -1,0 +1,301 @@
+//@version=5
+indicator("ManipulationX V.6", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Entries ──
+grp_ent    = "══════ Entries ══════"
+show_cont  = input.bool(true, "Continuations", group=grp_ent)
+cont_text  = input.string("C", "Continuation Text", group=grp_ent)
+show_rev   = input.bool(true, "Reversals", group=grp_ent)
+rev_text   = input.string("R", "Reversal Text", group=grp_ent)
+cont_color = input.color(color.new(#000000, 0), "Continuation Color", group=grp_ent)
+rev_color  = input.color(color.new(#000000, 0), "Reversal Color", group=grp_ent)
+
+// ── Killzones ──
+grp_kz     = "══════ Killzones ══════"
+use_kz     = input.bool(false, "Use Killzones", group=grp_kz)
+show_ny_kz = input.bool(true, "New York KZ", group=grp_kz)
+ny_kz_start = input.int(930, "NY Start", group=grp_kz)
+ny_kz_end   = input.int(1100, "NY End", group=grp_kz)
+show_lon_kz = input.bool(true, "London KZ", group=grp_kz)
+lon_kz_start = input.int(230, "London Start", group=grp_kz)
+lon_kz_end   = input.int(400, "London End", group=grp_kz)
+show_cust_kz = input.bool(false, "Custom KZ", group=grp_kz)
+cust_kz_start = input.int(930, "Custom Start", group=grp_kz)
+cust_kz_end   = input.int(2300, "Custom End", group=grp_kz)
+
+// ── IFVG ──
+grp_ifvg   = "══════ IFVG ══════"
+show_ifvg  = input.bool(true, "Show IFVGs", group=grp_ifvg)
+ifvg_color1 = input.color(color.new(#333333, 0), "IFVG Color 1", group=grp_ifvg)
+ifvg_color2 = input.color(color.new(#333333, 0), "IFVG Color 2", group=grp_ifvg)
+ifvg_tf     = input.string("Chart", "IFVG Source", options=["Chart", "15 min", "30 min", "1 hour"], group=grp_ifvg)
+ifvg_style  = input.string("Solid", "IFVG Line Style", options=["Solid", "Dashed", "Dotted"], group=grp_ifvg)
+ifvg_width  = input.int(1, "IFVG Line Width", minval=1, maxval=5, group=grp_ifvg)
+min_size    = input.int(1, "Minimum Size", group=grp_ifvg)
+size_filter = input.bool(true, "Size Filter", group=grp_ifvg)
+
+// ── HTF FVG ──
+grp_fvg    = "══════ HTF FVG ══════"
+mitigation = input.string("100%", "Mitigation Method", options=["100%", "50%", "0%"], group=grp_fvg)
+
+show_fvg_1h = input.bool(true, "Show Internal Liquidity (FVG)", group=grp_fvg)
+fvg_1h_tf   = input.string("1 hour", "FVG Timeframe 1", options=["15 min", "30 min", "1 hour", "4 hour"], group=grp_fvg)
+fvg_1h_mit  = input.string("100%", "Mitigation Method 1", options=["100%", "50%", "0%"], group=grp_fvg)
+show_text_1h = input.bool(true, "Show Text", group=grp_fvg)
+fvg_text_color1 = input.color(color.new(#999999, 0), "Text Color 1", group=grp_fvg)
+extend_fvg_1h = input.bool(false, "Extend FVG", group=grp_fvg)
+max_fvg_1h = input.int(3, "Max FVGs", minval=1, maxval=20, group=grp_fvg)
+
+show_fvg_15m = input.bool(true, "Show Internal Liquidity (FVG)", group=grp_fvg)
+fvg_15m_tf   = input.string("15 min", "FVG Timeframe 2", options=["5 min", "15 min", "30 min"], group=grp_fvg)
+fvg_15m_mit  = input.string("100%", "Mitigation Method 2", options=["100%", "50%", "0%"], group=grp_fvg)
+show_text_15m = input.bool(true, "Show Text", group=grp_fvg)
+fvg_text_color2 = input.color(color.new(#999999, 0), "Text Color 2", group=grp_fvg)
+extend_fvg_15m = input.bool(false, "Extend FVG", group=grp_fvg)
+max_fvg_15m = input.int(6, "Max FVGs", minval=1, maxval=20, group=grp_fvg)
+
+// ── SMT Divergence ──
+grp_smt    = "══════ SMT Divergence ══════"
+show_smt   = input.bool(true, "Show SMT", group=grp_smt)
+smt_len    = input.int(3, "Swing Lookback", minval=2, maxval=10, group=grp_smt)
+
+// ── Liquidity ──
+grp_liq    = "══════ Liquidity ══════"
+show_liq   = input.bool(true, "Show Liquidity", group=grp_liq)
+show_eq    = input.bool(true, "Show Equal H/L", group=grp_liq)
+liq_text   = input.string("$$$", "Liquidity Text", group=grp_liq)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FVG DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+get_fvg_tf(tf) =>
+    result = switch tf
+        "5 min"  => "5"
+        "15 min" => "15"
+        "30 min" => "30"
+        "1 hour" => "60"
+        "4 hour" => "240"
+        => "60"
+
+// FVG detection function
+detect_fvg(src_tf) =>
+    o2 = request.security(syminfo.tickerid, src_tf, open[2])
+    h2 = request.security(syminfo.tickerid, src_tf, high[2])
+    l0 = request.security(syminfo.tickerid, src_tf, low[0])
+    c1 = request.security(syminfo.tickerid, src_tf, close[1])
+    o1 = request.security(syminfo.tickerid, src_tf, open[1])
+    h0 = request.security(syminfo.tickerid, src_tf, high[0])
+    l2 = request.security(syminfo.tickerid, src_tf, low[2])
+    
+    bull = c1 > o1 and l0 > h2
+    bear = c1 < o1 and h0 < l2
+    
+    bull_top = bull ? l0 : na
+    bull_bot = bull ? h2 : na
+    bear_top = bear ? h0 : na
+    bear_bot = bear ? l2 : na
+    
+    [bull, bear, bull_top, bull_bot, bear_top, bear_bot]
+
+// 1H FVG
+tf_1h = get_fvg_tf(fvg_1h_tf)
+[fvg1h_bull, fvg1h_bear, fvg1h_bull_top, fvg1h_bull_bot, fvg1h_bear_top, fvg1h_bear_bot] = detect_fvg(tf_1h)
+
+// 15M FVG
+tf_15m = get_fvg_tf(fvg_15m_tf)
+[fvg15m_bull, fvg15m_bear, fvg15m_bull_top, fvg15m_bull_bot, fvg15m_bear_top, fvg15m_bear_bot] = detect_fvg(tf_15m)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IFVG DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+ifvg_src = if ifvg_tf == "Chart" then timeframe.period else get_fvg_tf(ifvg_tf)
+
+ifvg_o2 = request.security(syminfo.tickerid, ifvg_src, open[2])
+ifvg_h2 = request.security(syminfo.tickerid, ifvg_src, high[2])
+ifvg_l0 = request.security(syminfo.tickerid, ifvg_src, low[0])
+ifvg_c1 = request.security(syminfo.tickerid, ifvg_src, close[1])
+ifvg_o1 = request.security(syminfo.tickerid, ifvg_src, open[1])
+ifvg_h0 = request.security(syminfo.tickerid, ifvg_src, high[0])
+ifvg_l2 = request.security(syminfo.tickerid, ifvg_src, low[2])
+ifvg_c  = request.security(syminfo.tickerid, ifvg_src, close)
+ifvg_h  = request.security(syminfo.tickerid, ifvg_src, high)
+
+// Bullish IFVG: close above bearish FVG
+ifvg_bull = show_ifvg and ifvg_c1 < ifvg_o1 and ifvg_c > ifvg_h0 and ifvg_h0 < ifvg_l2
+// Bearish IFVG: close below bullish FVG
+ifvg_bear = show_ifvg and ifvg_c1 > ifvg_o1 and ifvg_c < ifvg_l0 and ifvg_l0 > ifvg_h2
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SMT DIVERGENCE
+// ══════════════════════════════════════════════════════════════════════════════
+
+ph = ta.pivothigh(high, smt_len, smt_len)
+pl_s = ta.pivotlow(low, smt_len, smt_len)
+
+ph_es = request.security("CME_MINI:ES1!", timeframe.period, ta.pivothigh(high, smt_len, smt_len))
+pl_es = request.security("CME_MINI:ES1!", timeframe.period, ta.pivotlow(low, smt_len, smt_len))
+
+var float prev_mnq_ph = na
+var float prev_mnq_pl = na
+var float prev_es_ph  = na
+var float prev_es_pl  = na
+
+if not na(ph)
+    prev_mnq_ph := ph
+if not na(pl_s)
+    prev_mnq_pl := pl_s
+if not na(ph_es)
+    prev_es_ph := ph_es
+if not na(pl_es)
+    prev_es_pl := pl_es
+
+smt_bull = show_smt and not na(pl_s) and not na(pl_es) and not na(prev_mnq_pl) and not na(prev_es_pl) and pl_s > prev_mnq_pl and pl_es < prev_es_pl
+smt_bear = show_smt and not na(ph) and not na(ph_es) and not na(prev_mnq_ph) and not na(prev_es_ph) and ph < prev_mnq_ph and ph_es > prev_es_ph
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIQUIDITY DETECTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+swing_hi = ta.pivothigh(high, 5, 5)
+swing_lo = ta.pivotlow(low, 5, 5)
+
+var float last_sh = na
+var float last_sh2 = na
+var float last_sl = na
+var float last_sl2 = na
+
+if not na(swing_hi)
+    last_sh2 := last_sh
+    last_sh := swing_hi
+
+if not na(swing_lo)
+    last_sl2 := last_sl
+    last_sl := swing_lo
+
+tol = 0.001
+eq_highs = show_eq and not na(last_sh) and not na(last_sh2) and math.abs(last_sh - last_sh2) / last_sh < tol
+eq_lows  = show_eq and not na(last_sl) and not na(last_sl2) and math.abs(last_sl - last_sl2) / last_sl < tol
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PLOTTING
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Style helpers
+getLineStyle(s) =>
+    switch s
+        "Dashed" => line.style_dashed
+        "Dotted" => line.style_dotted
+        => line.style_solid
+
+line_style = getLineStyle(ifvg_style)
+
+// ── FVG Boxes (1H) ──
+var box fvg1h_bull_box = na
+var box fvg1h_bear_box = na
+
+if fvg1h_bull and barstate.isconfirmed
+    fvg1h_bull_box := box.new(bar_index - 2, fvg1h_bull_top, bar_index + (extend_fvg_1h ? 50 : 15), fvg1h_bull_bot, bgcolor=color.new(#b0b0b0, 30), border_color=color.new(#b0b0b0, 50))
+
+if fvg1h_bear and barstate.isconfirmed
+    fvg1h_bear_box := box.new(bar_index - 2, fvg1h_bear_top, bar_index + (extend_fvg_1h ? 50 : 15), fvg1h_bear_bot, bgcolor=color.new(#b0b0b0, 30), border_color=color.new(#b0b0b0, 50))
+
+// ── FVG Boxes (15M) ──
+var box fvg15m_bull_box = na
+var box fvg15m_bear_box = na
+
+if fvg15m_bull and barstate.isconfirmed
+    fvg15m_bull_box := box.new(bar_index - 2, fvg15m_bull_top, bar_index + (extend_fvg_15m ? 50 : 15), fvg15m_bull_bot, bgcolor=color.new(#b0b0b0, 40), border_color=color.new(#b0b0b0, 60))
+
+if fvg15m_bear and barstate.isconfirmed
+    fvg15m_bear_box := box.new(bar_index - 2, fvg15m_bear_top, bar_index + (extend_fvg_15m ? 50 : 15), fvg15m_bear_bot, bgcolor=color.new(#b0b0b0, 40), border_color=color.new(#b0b0b0, 60))
+
+// ── FVG Labels ──
+if fvg1h_bull and show_text_1h and barstate.isconfirmed
+    label.new(bar_index + 10, fvg1h_bull_bot, "1H FVG", style=label.style_label_left, color=color.new(color.white, 100), textcolor=fvg_text_color1, size=size.tiny)
+if fvg1h_bear and show_text_1h and barstate.isconfirmed
+    label.new(bar_index + 10, fvg1h_bear_top, "1H FVG", style=label.style_label_left, color=color.new(color.white, 100), textcolor=fvg_text_color1, size=size.tiny)
+
+if fvg15m_bull and show_text_15m and barstate.isconfirmed
+    label.new(bar_index + 10, fvg15m_bull_bot, "15M FVG", style=label.style_label_left, color=color.new(color.white, 100), textcolor=fvg_text_color2, size=size.tiny)
+if fvg15m_bear and show_text_15m and barstate.isconfirmed
+    label.new(bar_index + 10, fvg15m_bear_top, "15M FVG", style=label.style_label_left, color=color.new(color.white, 100), textcolor=fvg_text_color2, size=size.tiny)
+
+// ── IFVG Lines ──
+var line ifvg_bull_line = na
+var line ifvg_bear_line = na
+
+if ifvg_bull and barstate.isconfirmed
+    ifvg_bull_line := line.new(bar_index - 2, ifvg_l0, bar_index + 10, ifvg_l0, color=ifvg_color1, style=line_style, width=ifvg_width)
+
+if ifvg_bear and barstate.isconfirmed
+    ifvg_bear_line := line.new(bar_index - 2, ifvg_h0, bar_index + 10, ifvg_h0, color=ifvg_color2, style=line_style, width=ifvg_width)
+
+// ── SMT Labels ──
+if smt_bull and barstate.isconfirmed
+    label.new(bar_index, low - ta.atr(14) * 0.5, "SMT", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
+if smt_bear and barstate.isconfirmed
+    label.new(bar_index, high + ta.atr(14) * 0.5, "SMT", style=label.style_label_down, color=color.new(color.red, 30), textcolor=color.white, size=size.tiny)
+
+// ── Entry Labels (Continuation/Reversal) ──
+// Detect reversal/continuation based on structure
+var int trend = 0
+if close > open
+    trend := 1
+else if close < open
+    trend := -1
+
+// Continuation: same direction as trend
+cont_long  = trend == 1 and close > open and close[1] > open[1]
+cont_short = trend == -1 and close < open and close[1] < open[1]
+
+// Reversal: V-shape pattern
+rev_long  = close > open and close[1] < open[1] and close > high[1]
+rev_short = close < open and close[1] > open[1] and close < low[1]
+
+if show_cont and cont_long and barstate.isconfirmed
+    label.new(bar_index, low - ta.atr(14) * 0.3, cont_text, style=label.style_label_up, color=cont_color, textcolor=color.white, size=size.tiny)
+if show_cont and cont_short and barstate.isconfirmed
+    label.new(bar_index, high + ta.atr(14) * 0.3, cont_text, style=label.style_label_down, color=cont_color, textcolor=color.white, size=size.tiny)
+
+if show_rev and rev_long and barstate.isconfirmed
+    label.new(bar_index, low - ta.atr(14) * 0.5, rev_text, style=label.style_label_up, color=rev_color, textcolor=color.white, size=size.tiny)
+if show_rev and rev_short and barstate.isconfirmed
+    label.new(bar_index, high + ta.atr(14) * 0.5, rev_text, style=label.style_label_down, color=rev_color, textcolor=color.white, size=size.tiny)
+
+// ── Liquidity Lines & Text ──
+if eq_highs and show_liq and barstate.isconfirmed
+    line.new(bar_index - 20, last_sh, bar_index + 5, last_sh, color=color.gray, style=line.style_dashed, width=1)
+    label.new(bar_index + 3, last_sh, liq_text, style=label.style_label_left, color=color.new(color.white, 100), textcolor=color.gray, size=size.tiny)
+
+if eq_lows and show_liq and barstate.isconfirmed
+    line.new(bar_index - 20, last_sl, bar_index + 5, last_sl, color=color.gray, style=line.style_dashed, width=1)
+    label.new(bar_index + 3, last_sl, liq_text, style=label.style_label_left, color=color.new(color.white, 100), textcolor=color.gray, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KILLZONE BACKGROUNDS
+// ══════════════════════════════════════════════════════════════════════════════
+
+is_ny_kz = use_kz and show_ny_kz and not na(time(timeframe.period, str.tostring(ny_kz_start) + "-" + str.tostring(ny_kz_end), "America/New_York"))
+is_lon_kz = use_kz and show_lon_kz and not na(time(timeframe.period, str.tostring(lon_kz_start) + "-" + str.tostring(lon_kz_end), "America/New_York"))
+is_cust_kz = use_kz and show_cust_kz and not na(time(timeframe.period, str.tostring(cust_kz_start) + "-" + str.tostring(cust_kz_end), "America/New_York"))
+
+bgcolor(is_ny_kz ? color.new(color.yellow, 92) : na, title="NY Killzone")
+bgcolor(is_lon_kz ? color.new(color.blue, 92) : na, title="London Killzone")
+bgcolor(is_cust_kz ? color.new(color.purple, 92) : na, title="Custom Killzone")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALERTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(ifvg_bull, "IFVG Bullish", "🟢 Bullish IFVG detected")
+alertcondition(ifvg_bear, "IFVG Bearish", "🔴 Bearish IFVG detected")
+alertcondition(smt_bull, "SMT Bullish", "🟢 Bullish SMT Divergence")
+alertcondition(smt_bear, "SMT Bearish", "🔴 Bearish SMT Divergence")
+alertcondition(fvg1h_bull or fvg1h_bear, "1H FVG", "1H FVG detected")
+alertcondition(fvg15m_bull or fvg15m_bear, "15M FVG", "15M FVG detected")
