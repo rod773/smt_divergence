@@ -1,0 +1,123 @@
+Crea un indicador en Pine Script v5 para TradingView llamado "ManipulationX V.6" que replique exactamente el indicador utilizado por EzTrades en su estrategia de trading para la sesión de Nueva York.
+
+## Componentes requeridos:
+
+### 1. HTF Fair Value Gaps (FVG)
+- Detectar FVG en múltiples timeframes: 15min y 1 hour (configurables)
+- Bullish FVG: vela [1] alcista, low[0] > high[2]
+- Bearish FVG: vela [1] bajista, high[0] < low[2]
+- Dibujar como CAJAS GRISES (`#b0b0b0`) que se extiendan hasta el borde derecho del chart usando `extend=extend.right`
+- Labels "1H FVG" y "15M FVG" al final del box (estilo `label.style_label_left`)
+- Max FVGs configurables (default: 3 para 1H, 6 para 15M)
+- Show Text ON/OFF
+- Extend FVG ON/OFF
+
+### 2. Inverse Fair Value Gap (IFVG)
+- Detectar en timeframe del chart o configurable
+- Bullish IFVG: `close[1] < open[1]` y `close > high[0]`
+- Bearish IFVG: `close[1] > open[1]` y `close < low[0]`
+- Dibujar LÍNEA horizontal sólida (color gris oscuro `#333333`)
+- Dibujar ZONA GRIS pequeña rectangular marca el IFVG
+- Label "IFVG" con color (verde=bull, rojo=bear)
+- Configuraciones: Source, Line Style (Solid/Dashed/Dotted), Line Width, Minimum Size, Size Filter
+
+### 3. SMT Divergence (Smart Money Technique)
+- Comparar swing highs/lows entre MNQ (chart actual) y ES (`CME_MINI:ES1!`)
+- Bullish SMT: ES hace lower low, MNQ hace higher low
+- Bearish SMT: ES hace higher high, MNQ hace lower high
+- Label "SMT" pequeño estilo `label.style_label_up/down` con color (verde/rojo)
+- Swing lookback configurable (default: 3)
+
+### 4. Entry Markers (Continuation/Reversal)
+- Continuation ("C"): Cuadrado NEGRO con texto blanco
+- Reversal ("R"): Cuadrado VERDE (bull) o ROJO (bear) con texto blanco
+- Detección basada en tendencia y patrón V-shape
+
+### 5. Liquidity (Equal Highs/Lows)
+- Detectar equal highs/lows con tolerancia de 0.1%
+- Línea horizontal DASHED gris
+- Label "$$$" al final
+- Basado en pivot high/low con lookback de 5
+
+### 6. Killzones (Opcional)
+- New York: 09:30-11:00 ET (amarillo)
+- London: 02:30-04:00 ET (azul)
+- Custom: configurable
+- Toggle ON/OFF
+
+## Inputs organizados por grupos:
+
+```
+══════ Entries ══════
+- Continuations (bool, default true)
+- Continuation Text (string, default "C")
+- Reversals (bool, default true)
+- Reversal Text (string, default "R")
+
+══════ Killzones ══════
+- Use Killzones (bool, default false)
+- New York KZ (bool, default true)
+- London KZ (bool, default true)
+
+══════ IFVG ══════
+- Show IFVGs (bool, default true)
+- IFVG Color 1 (color, default #333333)
+- IFVG Color 2 (color, default #333333)
+- IFVG Source (string: Chart/1 min/3 min/5 min)
+- IFVG Line Style (string: Solid/Dashed/Dotted)
+- IFVG Line Width (int, 1-5, default 1)
+- Minimum Size (int, default 1)
+- Size Filter (bool, default true)
+
+══════ HTF FVG ══════
+- Show Internal Liquidity (FVG) 1H (bool, default true)
+- FVG Timeframe 1 (string: 15 min/30 min/1 hour/4 hour)
+- Show Text 1H (bool, default true)
+- Extend FVG 1H (bool, default false)
+- Max FVGs 1H (int, 1-20, default 3)
+- Show Internal Liquidity (FVG) 15M (bool, default true)
+- FVG Timeframe 2 (string: 5 min/15 min/30 min)
+- Show Text 15M (bool, default true)
+- Extend FVG 15M (bool, default false)
+- Max FVGs 15M (int, 1-20, default 6)
+
+══════ SMT Divergence ══════
+- Show SMT (bool, default true)
+- Swing Lookback (int, 2-10, default 3)
+
+══════ Liquidity ══════
+- Show Liquidity (bool, default true)
+```
+
+## PLOTTING:
+- FVG boxes con `extend=extend.right` y color `#b0b0b0`
+- FVG labels al final del box
+- IFVG lines (solid horizontal)
+- IFVG zone boxes (small gray)
+- IFVG labels (green/red)
+- SMT labels (small, green/red)
+- Entry markers "C" (black) y "R" (green/red)
+- Liquidity dashed lines + "$$$" labels
+- Killzone backgrounds (optional)
+
+## ALERTS:
+- IFVG Bullish / IFVG Bearish
+- SMT Bullish / SMT Bearish
+
+## Restricciones:
+- overlay=true
+- max_boxes_count=500
+- max_lines_count=500
+- max_labels_count=500
+- No usar bibliotecas externas
+- Todo en un solo archivo .pine
+- Usar request.security para obtener datos de otros timeframes y tickers
+- FVG boxes deben extenderse al borde derecho con extend=extend.right
+
+## Visual esperado:
+- FVG: Cajas grises extendidas a la derecha con labels "1H FVG" / "15M FVG"
+- IFVG: Línea sólida horizontal + zona gris pequeña + label "IFVG"
+- SMT: Texto pequeño "SMT" cerca del swing point
+- Entries: Cuadrados negros "C" o coloreados "R"
+- Liquidity: Líneas dashed + "$$$"
+- Todo limpio y profesional como el indicador original de EzTrades
