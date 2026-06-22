@@ -65,24 +65,24 @@ inSessionRange(openStr, closeStr) =>
     tClose = timestamp("America/New_York", year, month, dayofmonth, cH, cM)
     time >= tOpen and time < tClose
 
-nyKz = false
-lonKz = false
+nyParts = str.split(nyStr, "-")
+nyOpenStr = array.get(nyParts, 0)
+nyCloseStr = array.get(nyParts, 1)
+nyKz = showKz and showNyKz and nyStr != "" and str.contains(nyStr, "-") and inSessionRange(nyOpenStr, nyCloseStr)
+bgcolor(nyKz ? cKzNy : na, title="NY Killzone")
 
-if showKz
-    if showNyKz and nyStr != "" and str.contains(nyStr, "-")
-        nyParts = str.split(nyStr, "-")
-        nyKz := inSessionRange(array.get(nyParts, 0), array.get(nyParts, 1))
-        bgcolor(nyKz ? cKzNy : na, title="NY Killzone")
-        if not nyKz[1] and nyKz
-            label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
-             textcolor=color.white, size=size.small)
-    if showLonKz and lonStr != "" and str.contains(lonStr, "-")
-        lonParts = str.split(lonStr, "-")
-        lonKz := inSessionRange(array.get(lonParts, 0), array.get(lonParts, 1))
-        bgcolor(lonKz ? cKzLon : na, title="London Killzone")
-        if not lonKz[1] and lonKz
-            label.new(bar_index, high, " London ", color=cKzLon, style=label.style_label_lower_left,
-             textcolor=color.white, size=size.small)
+lonParts = str.split(lonStr, "-")
+lonOpenStr = array.get(lonParts, 0)
+lonCloseStr = array.get(lonParts, 1)
+lonKz = showKz and showLonKz and lonStr != "" and str.contains(lonStr, "-") and inSessionRange(lonOpenStr, lonCloseStr)
+bgcolor(lonKz ? cKzLon : na, title="London Killzone")
+
+if nyKz and not nyKz[1]
+    label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
+     textcolor=color.white, size=size.small)
+if lonKz and not lonKz[1]
+    label.new(bar_index, high, " London ", color=cKzLon, style=label.style_label_lower_left,
+     textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  FVG DETECTION
