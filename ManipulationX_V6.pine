@@ -105,10 +105,27 @@ var float lonFinalHi = na
 var float lonFinalLo = na
 var float nyFinalHi = na
 var float nyFinalLo = na
-var bool asiaSweepHit = false
-var bool sydSweepHit = false
-var bool lonSweepHit = false
-var bool nySweepHit = false
+var float lastFinHi = na
+var float lastFinLo = na
+var bool lastFinHiHit = false
+var bool lastFinLoHit = false
+
+// Capture pre-update active session levels for sweep detection
+float activePrevHi = na
+float activePrevLo = na
+if showSweep
+    if not na(asiaH)
+        activePrevHi := na(activePrevHi) ? asiaH : math.max(activePrevHi, asiaH)
+        activePrevLo := na(activePrevLo) ? asiaL : math.min(activePrevLo, asiaL)
+    if not na(sydH)
+        activePrevHi := na(activePrevHi) ? sydH : math.max(activePrevHi, sydH)
+        activePrevLo := na(activePrevLo) ? sydL : math.min(activePrevLo, sydL)
+    if not na(lonH)
+        activePrevHi := na(activePrevHi) ? lonH : math.max(activePrevHi, lonH)
+        activePrevLo := na(activePrevLo) ? lonL : math.min(activePrevLo, lonL)
+    if not na(nyH)
+        activePrevHi := na(activePrevHi) ? nyH : math.max(activePrevHi, nyH)
+        activePrevLo := na(activePrevLo) ? nyL : math.min(activePrevLo, nyL)
 
 if showSessions and showSessBoxes
     if entered(asiaIn)
@@ -129,7 +146,10 @@ if showSessions and showSessBoxes
             label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
             asiaFinalHi := asiaH
             asiaFinalLo := asiaL
-            asiaSweepHit := false
+            lastFinHi := asiaH
+            lastFinLo := asiaL
+            lastFinHiHit := false
+            lastFinLoHit := false
             asiaH := na
             asiaL := na
             asiaStart := na
@@ -153,7 +173,10 @@ if showSessions and showSessBoxes
             label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
             sydFinalHi := sydH
             sydFinalLo := sydL
-            sydSweepHit := false
+            lastFinHi := sydH
+            lastFinLo := sydL
+            lastFinHiHit := false
+            lastFinLoHit := false
             sydH := na
             sydL := na
             sydStart := na
@@ -177,7 +200,10 @@ if showSessions and showSessBoxes
             label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
             lonFinalHi := lonH
             lonFinalLo := lonL
-            lonSweepHit := false
+            lastFinHi := lonH
+            lastFinLo := lonL
+            lastFinHiHit := false
+            lastFinLoHit := false
             lonH := na
             lonL := na
             lonStart := na
@@ -201,7 +227,10 @@ if showSessions and showSessBoxes
             label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
             nyFinalHi := nyH
             nyFinalLo := nyL
-            nySweepHit := false
+            lastFinHi := nyH
+            lastFinLo := nyL
+            lastFinHiHit := false
+            lastFinLoHit := false
             nyH := na
             nyL := na
             nyStart := na
@@ -328,43 +357,32 @@ if dHiSweep
 if dLoSweep
     barLoSweep := true
     dLoHit := true
-asiaHiSweep := barHiSweep
-asiaLoSweep := barLoSweep
 
-// Session level sweeps (using finalized session hi/lo, one sweep per level)
+float sweepHiPrice = na
+float sweepLoPrice = na
+
+// Session level sweeps: highest swept high (red) + lowest swept low (green)
 if showSweep
-    if not asiaSweepHit and not na(asiaFinalHi) and high > asiaFinalHi + swp and close < asiaFinalHi
-        asiaSweepHit := true
-        barHiSweep := true
-    if not asiaSweepHit and not na(asiaFinalLo) and low < asiaFinalLo - swp and close > asiaFinalLo
-        asiaSweepHit := true
-        barLoSweep := true
-    if not sydSweepHit and not na(sydFinalHi) and high > sydFinalHi + swp and close < sydFinalHi
-        sydSweepHit := true
-        barHiSweep := true
-    if not sydSweepHit and not na(sydFinalLo) and low < sydFinalLo - swp and close > sydFinalLo
-        sydSweepHit := true
-        barLoSweep := true
-    if not lonSweepHit and not na(lonFinalHi) and high > lonFinalHi + swp and close < lonFinalHi
-        lonSweepHit := true
-        barHiSweep := true
-    if not lonSweepHit and not na(lonFinalLo) and low < lonFinalLo - swp and close > lonFinalLo
-        lonSweepHit := true
-        barLoSweep := true
-    if not nySweepHit and not na(nyFinalHi) and high > nyFinalHi + swp and close < nyFinalHi
-        nySweepHit := true
-        barHiSweep := true
-    if not nySweepHit and not na(nyFinalLo) and low < nyFinalLo - swp and close > nyFinalLo
-        nySweepHit := true
-        barLoSweep := true
+    if not lastFinHiHit and not na(lastFinHi) and high > lastFinHi + swp and close < lastFinHi
+        lastFinHiHit := true
+        sweepHiPrice := lastFinHi
+    if not lastFinLoHit and not na(lastFinLo) and low < lastFinLo - swp and close > lastFinLo
+        lastFinLoHit := true
+        sweepLoPrice := lastFinLo
+    if not na(activePrevHi) and high > activePrevHi + swp and close < activePrevHi
+        if na(sweepHiPrice) or activePrevHi > sweepHiPrice
+            sweepHiPrice := activePrevHi
+    if not na(activePrevLo) and low < activePrevLo - swp and close > activePrevLo
+        if na(sweepLoPrice) or activePrevLo < sweepLoPrice
+            sweepLoPrice := activePrevLo
 
-// Draw at most one label per direction per bar
-if barHiSweep
-    label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
-if barLoSweep
-    label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
-asiaHiSweep := barHiSweep
-asiaLoSweep := barLoSweep
+// Draw at most one label per direction, at the actual swept level price
+if not na(sweepHiPrice)
+    label.new(bar_index, sweepHiPrice, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+if not na(sweepLoPrice)
+    label.new(bar_index, sweepLoPrice, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+asiaHiSweep := barHiSweep or not na(sweepHiPrice)
+asiaLoSweep := barLoSweep or not na(sweepLoPrice)
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
