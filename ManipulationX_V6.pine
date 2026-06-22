@@ -12,7 +12,6 @@ showSmt = input.bool(true, 'Show SMT Divergence')
 smtSymbol = input.symbol('MES1!', 'SMT Symbol')
 showSweep = input.bool(true, 'Show Liquidity Sweeps')
 sweepTicks = input.int(2, 'Sweep Threshold (ticks)', minval = 1, maxval = 20)
-levelType = input.string('Sessions', 'Level Type', options = ['Sessions', 'Daily'])
 showDol = input.bool(true, 'Show DOL Levels')
 dolMinTicks = input.int(16, 'Min DOL Swing (ticks)', minval = 4, maxval = 200)
 dolNyOnly = input.bool(true, 'DOL only during NY session')
@@ -25,66 +24,6 @@ cSmtBear = input.color(#FF9800, 'Bearish SMT')
 cDol = input.color(#9C27B0, 'DOL')
 cKzNy = color.new(#546E7A, 60)
 cKzLon = color.new(#455A64, 65)
-
-// ─── Session H/L Lines (from sessionn_lines.pine) ────────────────────────────
-type SessionDisp
-	line hiLine
-	line loLine
-	float hi
-	float lo
-	bool finalized
-	label hiLabel
-	label loLabel
-
-type SessionInfo
-	color col
-	string name
-	string session
-	string tz
-	SessionDisp active = na
-
-var array<SessionInfo> sessionInfos = array.new<SessionInfo>()
-sessionInfos.push(SessionInfo.new(color.new(#2962FF, 85), 'Tokyo', '1000-1500', 'Asia/Tokyo'))
-sessionInfos.push(SessionInfo.new(color.new(#FF9800, 85), 'London', '0830-1415', 'Europe/London'))
-sessionInfos.push(SessionInfo.new(color.new(#089981, 85), 'NY', '0930-1600', 'America/New_York'))
-
-int dayMs = 24 * 60 * 60 * 1000
-int extendMs = 3 * dayMs
-
-createSession(SessionInfo this) =>
-    float hi = high
-    float lo = low
-    line hiLine = line.new(time, hi, time, hi, xloc = xloc.bar_time, color = this.col, width = 1)
-    line loLine = line.new(time, lo, time, lo, xloc = xloc.bar_time, color = this.col, width = 1)
-    label hiLb = label.new(bar_index, hi, this.name + ' H', style = label.style_label_left, color = color.new(this.col, 80), textcolor = this.col, size = size.small)
-    label loLb = label.new(bar_index, lo, this.name + ' L', style = label.style_label_left, color = color.new(this.col, 80), textcolor = this.col, size = size.small)
-    this.active := SessionDisp.new(hiLine, loLine, hi, lo, false, hiLb, loLb)
-    this.active
-
-updateSession(SessionInfo this) =>
-    SessionDisp d = this.active
-    d.hi := math.max(d.hi, high)
-    d.lo := math.min(d.lo, low)
-
-finalizeSession(SessionInfo this) =>
-    SessionDisp d = this.active
-    if not d.finalized
-        int endT = time
-        int extT = endT + extendMs
-        line.set_x1(d.hiLine, endT)
-        line.set_x2(d.hiLine, extT)
-        line.set_y1(d.hiLine, d.hi)
-        line.set_y2(d.hiLine, d.hi)
-        line.set_x1(d.loLine, endT)
-        line.set_x2(d.loLine, extT)
-        line.set_y1(d.loLine, d.lo)
-        line.set_y2(d.loLine, d.lo)
-        label.set_x(d.hiLabel, bar_index + 1)
-        label.set_y(d.hiLabel, d.hi)
-        label.set_x(d.loLabel, bar_index + 1)
-        label.set_y(d.loLabel, d.lo)
-        d.finalized := true
-        d.finalized
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
 var inNy = false
@@ -204,75 +143,35 @@ bool asiaHiSweep = false
 asiaLoSweep = false
 lonHiSweep = false
 lonLoSweep = false
-if levelType == 'Daily'
-    [dHi, dLo] = request.security(syminfo.tickerid, 'D', [high[1], low[1]])
-    var bool dHiHit = false
-    var bool dLoHit = false
-    var bool dNew = false
-    var line dHiLine = na
-    var line dLoLine = na
-    dNew := barstate.isfirst or timeframe.change('1D')
-    if dNew
-        dHiHit := false
-        dLoHit := false
-        line.delete(dHiLine)
-        line.delete(dLoLine)
-        if showSweep and not na(dHi)
-            dHiLine := line.new(bar_index[1], dHi, bar_index, dHi, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
-            dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
-            dLoLine
-    // Sweeps: break level + close back inside
-    dHiSweep = showSweep and dNew and not dHiHit and high > dHi + swp and close < dHi
-    dLoSweep = showSweep and dNew and not dLoHit and low < dLo - swp and close > dLo
-    if dHiSweep
-        label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
-        dHiHit := true
-        dHiHit
-    if dLoSweep
-        label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
-        dLoHit := true
-        dLoHit
-    // SMT alerts still use same variables
-    asiaHiSweep := dHiSweep
-    asiaLoSweep := dLoSweep
-    lonHiSweep := false
-    lonLoSweep := false
-    lonLoSweep
-else // ─── Session H/L Lines (from sessionn_lines.pine) ─────────────────────────
-    if timeframe.isintraday
-        bool isChange = timeframe.change('1D')
-        for info in sessionInfos
-            bool inSess = not na(time('', info.session, info.tz))
-            if inSess
-                if na(info.active) or isChange
-                    createSession(info)
-                else
-                    updateSession(info)
-            else
-                if not na(info.active)
-                    finalizeSession(info)
-                    info.active := na
-                    info.active
+[dHi, dLo] = request.security(syminfo.tickerid, 'D', [high[1], low[1]])
+var bool dHiHit = false
+var bool dLoHit = false
+var bool dNew = false
+var line dHiLine = na
+var line dLoLine = na
+dNew := barstate.isfirst or timeframe.change('1D')
+if dNew
+    dHiHit := false
+    dLoHit := false
+    line.delete(dHiLine)
+    line.delete(dLoLine)
+    if showSweep and not na(dHi)
+        dHiLine := line.new(bar_index[1], dHi, bar_index, dHi, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
+        dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
 
-    // Sweep detection using session levels
-    if showSweep
-        sweepHi = false
-        sweepLo = false
-        for info in sessionInfos
-            if not na(info.active)
-                if high > info.active.hi + swp and close < info.active.hi
-                    sweepHi := true
-                    sweepHi
-                if low < info.active.lo - swp and close > info.active.lo
-                    sweepLo := true
-                    sweepLo
-        if sweepHi
-            label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
-        if sweepLo
-            label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
-        asiaHiSweep := sweepHi
-        asiaLoSweep := sweepLo
-        asiaLoSweep
+// Sweeps: break level + close back inside
+dHiSweep = showSweep and dNew and not dHiHit and high > dHi + swp and close < dHi
+dLoSweep = showSweep and dNew and not dLoHit and low < dLo - swp and close > dLo
+if dHiSweep
+    label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+    dHiHit := true
+if dLoSweep
+    label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+    dLoHit := true
+asiaHiSweep := dHiSweep
+asiaLoSweep := dLoSweep
+lonHiSweep := false
+lonLoSweep := false
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
