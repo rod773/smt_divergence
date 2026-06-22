@@ -49,34 +49,40 @@ cIfvgBear      = input.color(color.new(#FF1744, 20), "Bearish IFVG")
 cSmtBull       = input.color(#2196F3, "Bullish SMT")
 cSmtBear       = input.color(#FF9800, "Bearish SMT")
 cLiq           = input.color(#9C27B0, "Liquidity Label")
-cKz            = input.color(color.new(#546E7A, 82), "Killzone")
+cKzNy          = input.color(color.new(#546E7A, 75), "NY Killzone")
+cKzLon         = input.color(color.new(#455A64, 78), "London Killzone")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  KILLZONE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-drawKZ(labelTxt, rangeStr, col) =>
-    parts   = str.split(rangeStr, "-")
-    if array.size(parts) == 2
-        oH = int(str.tonumber(str.substring(array.get(parts, 0), 0, 2)))
-        oM = int(str.tonumber(str.substring(array.get(parts, 0), 3, 5)))
-        cH = int(str.tonumber(str.substring(array.get(parts, 1), 0, 2)))
-        cM = int(str.tonumber(str.substring(array.get(parts, 1), 3, 5)))
-        if not na(oH) and not na(oM) and not na(cH) and not na(cM)
-            tOpen  = timestamp("America/New_York", year, month, dayofmonth, oH, oM)
-            tClose = timestamp("America/New_York", year, month, dayofmonth, cH, cM)
-            inZone = time >= tOpen and time < tClose
-            if inZone and barstate.isconfirmed == false
-                box.new(bar_index, high*1.005, bar_index+1, low*0.995, border_color=col, bgcolor=col)
-            if time >= tOpen and time < tOpen + 120000
-                label.new(bar_index, high, labelTxt, color=col, style=label.style_label_lower_left,
-                 textcolor=color.white, size=size.small)
+inSessionRange(openStr, closeStr) =>
+    oH = int(str.tonumber(str.substring(openStr, 0, 2)))
+    oM = int(str.tonumber(str.substring(openStr, 3, 5)))
+    cH = int(str.tonumber(str.substring(closeStr, 0, 2)))
+    cM = int(str.tonumber(str.substring(closeStr, 3, 5)))
+    tOpen  = timestamp("America/New_York", year, month, dayofmonth, oH, oM)
+    tClose = timestamp("America/New_York", year, month, dayofmonth, cH, cM)
+    time >= tOpen and time < tClose
+
+nyKz = false
+lonKz = false
 
 if showKz
-    if showNyKz and nyStr != ""
-        drawKZ(" NY Open ", nyStr, cKz)
-    if showLonKz and lonStr != ""
-        drawKZ(" London ", lonStr, cKz)
+    if showNyKz and nyStr != "" and str.contains(nyStr, "-")
+        nyParts = str.split(nyStr, "-")
+        nyKz := inSessionRange(array.get(nyParts, 0), array.get(nyParts, 1))
+        bgcolor(nyKz ? cKzNy : na, title="NY Killzone")
+        if not nyKz[1] and nyKz
+            label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
+             textcolor=color.white, size=size.small)
+    if showLonKz and lonStr != "" and str.contains(lonStr, "-")
+        lonParts = str.split(lonStr, "-")
+        lonKz := inSessionRange(array.get(lonParts, 0), array.get(lonParts, 1))
+        bgcolor(lonKz ? cKzLon : na, title="London Killzone")
+        if not lonKz[1] and lonKz
+            label.new(bar_index, high, " London ", color=cKzLon, style=label.style_label_lower_left,
+             textcolor=color.white, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  FVG DETECTION
