@@ -32,10 +32,8 @@ smtSymbol      = input.symbol("ES1!", "SMT Comparison Symbol")
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
 showKz         = input.bool(true, "Use Killzones")
-showNyKz       = input.bool(true, "New York KZ")
-nyStr          = input.string("09:30-16:00", "NY Hours (HH:MM-HH:MM)")
-showLonKz      = input.bool(false, "London KZ")
-lonStr         = input.string("03:00-12:00", "London Hours (HH:MM-HH:MM)")
+showNyKz       = input.bool(true, "New York KZ (09:30-16:00 ET)")
+showLonKz      = input.bool(false, "London KZ (03:00-12:00 ET)")
 
 // ─── Reversals / Continuations ───────────────────────────────────────────────
 showReversals  = input.bool(true, "Show Reversals")
@@ -49,38 +47,28 @@ cIfvgBear      = input.color(color.new(#FF1744, 20), "Bearish IFVG")
 cSmtBull       = input.color(#2196F3, "Bullish SMT")
 cSmtBear       = input.color(#FF9800, "Bearish SMT")
 cLiq           = input.color(#9C27B0, "Liquidity Label")
-cKzNy          = input.color(color.new(#546E7A, 75), "NY Killzone")
-cKzLon         = input.color(color.new(#455A64, 78), "London Killzone")
+cKzNy          = input.color(color.new(#546E7A, 60), "NY Killzone")
+cKzLon         = input.color(color.new(#455A64, 65), "London Killzone")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  KILLZONE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-inSessionRange(openStr, closeStr) =>
-    oH = int(str.tonumber(str.substring(openStr, 0, 2)))
-    oM = int(str.tonumber(str.substring(openStr, 3, 5)))
-    cH = int(str.tonumber(str.substring(closeStr, 0, 2)))
-    cM = int(str.tonumber(str.substring(closeStr, 3, 5)))
-    tOpen  = timestamp("America/New_York", year, month, dayofmonth, oH, oM)
-    tClose = timestamp("America/New_York", year, month, dayofmonth, cH, cM)
-    time >= tOpen and time < tClose
-
-nyParts = str.split(nyStr, "-")
-nyOpenStr = array.get(nyParts, 0)
-nyCloseStr = array.get(nyParts, 1)
-nyKz = showKz and showNyKz and nyStr != "" and str.contains(nyStr, "-") and inSessionRange(nyOpenStr, nyCloseStr)
+// NY Killzone: 09:30-16:00 ET
+nySession = time(timeframe.period, "0930-1600", "America/New_York")
+nyKz = showKz and showNyKz and not na(nySession)
+nyOpenBar = showKz and showNyKz and na(nySession[1]) and not na(nySession)
 bgcolor(nyKz ? cKzNy : na, title="NY Killzone")
-
-lonParts = str.split(lonStr, "-")
-lonOpenStr = array.get(lonParts, 0)
-lonCloseStr = array.get(lonParts, 1)
-lonKz = showKz and showLonKz and lonStr != "" and str.contains(lonStr, "-") and inSessionRange(lonOpenStr, lonCloseStr)
-bgcolor(lonKz ? cKzLon : na, title="London Killzone")
-
-if nyKz and not nyKz[1]
+if nyOpenBar
     label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
      textcolor=color.white, size=size.small)
-if lonKz and not lonKz[1]
+
+// London Killzone: 03:00-12:00 ET
+lonSession = time(timeframe.period, "0300-1200", "America/New_York")
+lonKz = showKz and showLonKz and not na(lonSession)
+lonOpenBar = showKz and showLonKz and na(lonSession[1]) and not na(lonSession)
+bgcolor(lonKz ? cKzLon : na, title="London Killzone")
+if lonOpenBar
     label.new(bar_index, high, " London ", color=cKzLon, style=label.style_label_lower_left,
      textcolor=color.white, size=size.small)
 
