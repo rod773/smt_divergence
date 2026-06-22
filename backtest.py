@@ -124,21 +124,29 @@ def detect_sweeps(df, lb=10):
 
 df["sBul"], df["sBer"] = detect_sweeps(df)
 
-# ─── Entry signals ────────────────────────────────────────────────────────────
+# ─── Trend filter from MACD divergence ───────────────────────────────────────
+df["trend"] = 0  # 0=neutral, 1=bullish, -1=bearish
+last_trend = 0
+for i in range(len(df)):
+    if df["macdBull"].iloc[i]:
+        last_trend = 1
+    elif df["macdBear"].iloc[i]:
+        last_trend = -1
+    df.loc[df.index[i], "trend"] = last_trend
+
+# ─── Entry signals (filtered by trend) ────────────────────────────────────────
 fvg_lb = 10
 df["entryLong"]=False; df["entryShort"]=False
-df["entryStrongL"]=False; df["entryStrongS"]=False
 
 for i in range(1, len(df)):
     s = max(0, i-fvg_lb)
     nearB = df["fvgBull"].iloc[s:i+1].any()
     nearR = df["fvgBear"].iloc[s:i+1].any()
-    if df["sBul"].iloc[i] and nearB:
+    tr = df["trend"].iloc[i]
+    if df["sBul"].iloc[i] and nearB and tr != -1:  # long allowed in bull/neutral
         df.loc[df.index[i], "entryLong"] = True
-        if df["macdBull"].iloc[i]: df.loc[df.index[i], "entryStrongL"] = True
-    if df["sBer"].iloc[i] and nearR:
+    if df["sBer"].iloc[i] and nearR and tr != 1:   # short allowed in bear/neutral
         df.loc[df.index[i], "entryShort"] = True
-        if df["macdBear"].iloc[i]: df.loc[df.index[i], "entryStrongS"] = True
 
 # ─── Backtest ─────────────────────────────────────────────────────────────────
 trades = []
@@ -148,9 +156,9 @@ equity=[10000]; bars=df.index
 
 for i in range(1, len(df)):
     if in_trade==0:
-        if df["entryStrongL"].iloc[i] or df["entryLong"].iloc[i]:
+        if df["entryLong"].iloc[i]:
             in_trade=1; entry_p=df["Close"].iloc[i]; entry_i=i; entry_d="long"
-        elif df["entryStrongS"].iloc[i] or df["entryShort"].iloc[i]:
+        elif df["entryShort"].iloc[i]:
             in_trade=-1; entry_p=df["Close"].iloc[i]; entry_i=i; entry_d="short"
     else:
         hi=df["High"].iloc[i]; lo=df["Low"].iloc[i]; cl=df["Close"].iloc[i]
@@ -178,16 +186,12 @@ for i in range(1, len(df)):
 # ─── Results ──────────────────────────────────────────────────────────────────
 win=[t for t in trades if t["ret"]>0]
 los=[t for t in trades if t["ret"]<=0]
-strong=[t for t in trades if t.get("strong")]
 print(f"\n--- Backtest Results ---")
-print(f"Trades: {len(trades)} (strong: {len(strong)})")
+print(f"Trades: {len(trades)}")
 print(f"Win rate: {len(win)/len(trades)*100:.1f}%")
 if win and los:
     print(f"Avg win: {np.mean([t['ret'] for t in win]):.2f}%")
     print(f"Avg loss: {np.mean([t['ret'] for t in los]):.2f}%")
-if strong:
-    sw=[t for t in strong if t["ret"]>0]
-    print(f"Strong trades: {len(strong)}, win: {len(sw)/len(strong)*100:.1f}%")
 if trades:
     print(f"Total return: {(equity[-1]/equity[0]-1)*100:.1f}%")
     print(f"Final equity: ${equity[-1]:.0f}")
@@ -227,6 +231,14 @@ for t in trades:
              color=c, lw=0.5, ls="--", zorder=9)
 
 ax1.set_ylabel("Price"); ax1.legend(loc="upper left", fontsize=7); ax1.grid(alpha=0.2)
+
+# Trend shading
+for i in range(1, len(df)):
+    tr = df["trend"].iloc[i]
+    if tr == 1:
+        ax1.axvspan(df.index[i-1], df.index[i], alpha=0.04, color="#00E676", zorder=0)
+    elif tr == -1:
+        ax1.axvspan(df.index[i-1], df.index[i], alpha=0.04, color="#FF5252", zorder=0)
 
 # MACD panel
 ax2.axhline(0, color="#666", lw=0.5)
