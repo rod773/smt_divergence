@@ -17,17 +17,17 @@ dolMinTicks = input.int(16, 'Min DOL Swing (ticks)', minval = 4, maxval = 200)
 dolNyOnly = input.bool(true, 'DOL only during NY session')
 showKz = input.bool(true, 'Use Killzones')
 showSessions = input.bool(true, 'Show Session Boxes')
-asiaSess = input.session('0100-0900', 'Asia session')
+asiaSess = input.session('0700-1500', 'Asia session')
 asiaColor = input.color(color.yellow, 'Asia color')
-sydSess = input.session('2300-0700', 'Sydney session')
+sydSess = input.session('0500-1300', 'Sydney session')
 sydColor = input.color(color.rgb(255, 69, 0), 'Sydney color')
-lonSess = input.session('0800-1700', 'London session')
+lonSess = input.session('1400-2300', 'London session')
 lonColor = input.color(color.blue, 'London color')
-nySess = input.session('1400-2200', 'New York session')
+nySess = input.session('2000-0400', 'New York session')
 nyColor = input.color(color.purple, 'New York color')
 sessTransp = input.int(85, 'Session box transparency')
 sessLineStyle = input.string('solid', 'Session line style', options = ['solid', 'dashed', 'dotted'])
-sessTz = input.string('America/New_York', 'Session timezone', options = ['America/New_York', 'Europe/London', 'Europe/Madrid', 'Asia/Tokyo'])
+sessTz = input.string('Europe/Madrid', 'Session timezone', options = ['America/New_York', 'Europe/London', 'Europe/Madrid', 'Asia/Tokyo'])
 
 cFvgBull = input.color(color.new(#00ff88, 50), 'Bullish FVG')
 cFvgBear = input.color(color.new(#ff4444, 50), 'Bearish FVG')
@@ -380,7 +380,7 @@ if showDol and (not dolNyOnly or inNy)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    lbl = '1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
+    lbl = '1. NY session (15:30 Madrid)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
     label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
