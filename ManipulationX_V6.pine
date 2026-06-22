@@ -1,5 +1,5 @@
 //@version=5
-indicator("ManipulationX V.6", overlay=true, max_lines_count=200, max_labels_count=200, max_boxes_count=150)
+indicator("ManipulationX V.6", overlay=true, max_lines_count=300, max_labels_count=300, max_boxes_count=150)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15   = input.bool(true,  "Show 15m FVG")
@@ -9,7 +9,9 @@ fvgMinTicks = input.int(8, "Min FVG Gap (ticks)", minval=1, maxval=50)
 fvgNyOnly   = input.bool(true,  "FVG only during NY session")
 showIFVG    = input.bool(true,  "Show iFVGs")
 showSmt     = input.bool(true,  "Show SMT Divergence")
-smtSymbol   = input.symbol("ES1!", "SMT Symbol")
+smtSymbol   = input.symbol("MES1!", "SMT Symbol")
+showSweep   = input.bool(true,  "Show Liquidity Sweeps")
+sweepTicks  = input.int(2, "Sweep Threshold (ticks)", minval=1, maxval=20)
 showDol     = input.bool(true,  "Show DOL Levels")
 dolMinTicks = input.int(16, "Min DOL Swing (ticks)", minval=4, maxval=200)
 dolNyOnly   = input.bool(true,  "DOL only during NY session")
@@ -136,7 +138,61 @@ if not na(nqPh)
             label.new(bar_index, high, " SMT", color=cSmtBear,
              style=label.style_label_down, textcolor=color.white, size=size.small)
 
-// ─── DOL Levels (alternating highs/lows, filtered by swing size) ─────────────
+// ─── Session Levels + Liquidity Sweeps ───────────────────────────────────────
+// Asia: 19:00-03:00 ET   London: 03:00-12:00 ET
+asiaSess = time(timeframe.period, "1900-2400,0000-0300", "America/New_York")
+asiaNew = na(asiaSess[1]) and not na(asiaSess)
+asiaEnd = not na(asiaSess[1]) and na(asiaSess)
+
+var float asiaHi = na
+var float asiaLo = na
+asiaClosed = na(asiaSess) and not na(asiaHi)
+
+if asiaNew
+    asiaHi := high
+    asiaLo := low
+if not na(asiaSess) and not na(asiaHi)
+    asiaHi := math.max(asiaHi, high)
+    asiaLo := math.min(asiaLo, low)
+
+var float lonHi = na
+var float lonLo = na
+lonNew = na(lonSess[1]) and not na(lonSess)
+lonEnd = not na(lonSess[1]) and na(lonSess)
+lonClosed = na(lonSess) and not na(lonHi)
+
+if lonNew
+    lonHi := high
+    lonLo := low
+if not na(lonSess) and not na(lonHi)
+    lonHi := math.max(lonHi, high)
+    lonLo := math.min(lonLo, low)
+
+// Draw session level lines once when each session ends
+if showSweep and asiaEnd and not na(asiaHi)
+    line.new(bar_index, asiaHi, bar_index, asiaHi, color=color.new(#FFD600, 30), width=1, extend=extend.right)
+    line.new(bar_index, asiaLo, bar_index, asiaLo, color=color.new(#FFD600, 30), width=1, extend=extend.right)
+if showSweep and lonEnd and not na(lonHi)
+    line.new(bar_index, lonHi, bar_index, lonHi, color=color.new(#FFD600, 30), width=1, extend=extend.right)
+    line.new(bar_index, lonLo, bar_index, lonLo, color=color.new(#FFD600, 30), width=1, extend=extend.right)
+
+// Detect sweeps only on completed sessions (not while forming)
+if showSweep
+    swp = sweepTicks * syminfo.mintick
+    if asiaClosed and high > asiaHi + swp and close < asiaHi
+        label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
+         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    if asiaClosed and low < asiaLo - swp and close > asiaLo
+        label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
+         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+    if lonClosed and high > lonHi + swp and close < lonHi
+        label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
+         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    if lonClosed and low < lonLo - swp and close > lonLo
+        label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
+         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+
+// ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
     dolPh = ta.pivothigh(high, 4, 4)
     dolPl = ta.pivotlow(low, 4, 4)
@@ -174,7 +230,14 @@ if barstate.islast
      style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
+bSweepAsia = asiaClosed and high > asiaHi + sweepTicks * syminfo.mintick and close < asiaHi
+sSweepAsia = asiaClosed and low < asiaLo - sweepTicks * syminfo.mintick and close > asiaLo
+bSweepLon  = lonClosed and high > lonHi + sweepTicks * syminfo.mintick and close < lonHi
+sSweepLon  = lonClosed and low < lonLo - sweepTicks * syminfo.mintick and close > lonLo
+
 alertcondition(bSMT, "Bullish SMT")
 alertcondition(sSMT, "Bearish SMT")
 alertcondition(bIFVG, "Bullish IFVG")
 alertcondition(sIFVG, "Bearish IFVG")
+alertcondition(bSweepAsia or bSweepLon, "Bearish Sweep")
+alertcondition(sSweepAsia or sSweepLon, "Bullish Sweep")
