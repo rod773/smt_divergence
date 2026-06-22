@@ -11,6 +11,8 @@ showIFVG    = input.bool(true,  "Show iFVGs")
 showSmt     = input.bool(true,  "Show SMT Divergence")
 smtSymbol   = input.symbol("ES1!", "SMT Symbol")
 showDol     = input.bool(true,  "Show DOL Levels")
+dolMinTicks = input.int(16, "Min DOL Swing (ticks)", minval=4, maxval=200)
+dolNyOnly   = input.bool(true,  "DOL only during NY session")
 showSr      = input.bool(true,  "Show S/R Levels")
 srMinTicks  = input.int(12, "Min S/R Swing (ticks)", minval=2, maxval=100)
 srNyOnly    = input.bool(true,  "S/R only during NY session")
@@ -134,14 +136,24 @@ if not na(nqPh)
             label.new(bar_index, high, " SMT", color=cSmtBear,
              style=label.style_label_down, textcolor=color.white, size=size.small)
 
-// ─── DOL Levels ──────────────────────────────────────────────────────────────
-if showDol
-    if not na(nqPh)
+// ─── DOL Levels (alternating highs/lows, filtered by swing size) ─────────────
+if showDol and (not dolNyOnly or inNy)
+    dolPh = ta.pivothigh(high, 4, 4)
+    dolPl = ta.pivotlow(low, 4, 4)
+    dolMin = dolMinTicks * syminfo.mintick
+    var float lastDolHi = na
+    var float lastDolLo = na
+    var string dolLast = ""
+    if not na(dolPh) and (dolLast == "" or dolLast == "low") and (na(lastDolLo) or dolPh - lastDolLo >= dolMin)
         label.new(bar_index, high, "DOL", color=cDol,
          style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if not na(nqPl)
+        lastDolHi := dolPh
+        dolLast := "high"
+    if not na(dolPl) and (dolLast == "" or dolLast == "high") and (na(lastDolHi) or lastDolHi - dolPl >= dolMin)
         label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
+        lastDolLo := dolPl
+        dolLast := "low"
 
 // ─── S/R Levels (thin boxes, filtered) ───────────────────────────────────────
 if showSr and (not srNyOnly or inNy)
