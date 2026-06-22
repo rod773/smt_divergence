@@ -90,49 +90,53 @@ detectFVG(tf) =>
 m1hi1 = request.security(syminfo.tickerid, "1", high[1])
 m1lo1 = request.security(syminfo.tickerid, "1", low[1])
 
-// Bullish IFVG: red candle closes below prior low, then green candle closes up
-bullIFVG = m1cl < m1op and m1cl < m1lo1 and close > open
-bearIFVG = m1cl > m1op and m1cl > m1hi1 and close < open
-
-// Size filter
-ifvgSize = math.abs(close - open)
-ifvgValid = (not ifvgSizeFilter) or (ifvgSize >= ifvgMinSize)
+// Bullish IFVG: bearish 1m closes below prior low, then price breaks above its high
+ifvgBody = math.abs(m1cl - m1op)
+bullIFVG = m1cl < m1op and m1cl < m1lo1 and close > m1hi1 and ifvgBody >= ifvgMinSize
+bearIFVG = m1cl > m1op and m1cl > m1hi1 and close < m1lo1 and ifvgBody >= ifvgMinSize
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SMT DIVERGENCE
+//  SMT DIVERGENCE (swing-based, reduced signals)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 smtHi = request.security(smtSymbol, timeframe.period, high)
 smtLo = request.security(smtSymbol, timeframe.period, low)
 
-swL = low < low[1] and low <= low[2]
-swH = high > high[1] and high >= high[2]
+// 3-bar swing confirmation
+swingLow  = low < low[1] and low < low[2] and low < low[3]
+swingHigh = high > high[1] and high > high[2] and high > high[3]
 
-bullSMT = swL and low > low[2] and smtLo < smtLo[2]
-bearSMT = swH and high < high[2] and smtHi > smtHi[2]
+// Track previous swing values
+var float prevNqLow = na
+var float prevEsLow = na
+var float prevNqHigh = na
+var float prevEsHigh = na
+
+bullSMT = false
+bearSMT = false
+
+if swingLow
+    if not na(prevNqLow) and not na(prevEsLow) and low > prevNqLow and smtLo < prevEsLow
+        bullSMT := true
+    prevNqLow := low
+    prevEsLow := smtLo
+
+if swingHigh
+    if not na(prevNqHigh) and not na(prevEsHigh) and high < prevNqHigh and smtHi > prevEsHigh
+        bearSMT := true
+    prevNqHigh := high
+    prevEsHigh := smtHi
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LIQUIDITY LEVELS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if showLiq
-    eqhFound = false
-    eqlFound = false
-    for i = 3 to liqLook
-        if not eqhFound and high == high[i] and high > high[1]
-            label.new(bar_index[i], high[i], "EQH", color=cLiq,
-             style=label.style_label_down, textcolor=color.white, size=size.tiny)
-            eqhFound := true
-        if not eqlFound and low == low[i] and low < low[1]
-            label.new(bar_index[i], low[i], "EQL", color=cLiq,
-             style=label.style_label_up, textcolor=color.white, size=size.tiny)
-            eqlFound := true
-    // Recent swing
-    if high[1] > high and high[1] > high[2]
-        label.new(bar_index[1], high[1], "DOL", color=cLiq,
+    if swingHigh
+        label.new(bar_index, high, "DOL", color=cLiq,
          style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if low[1] < low and low[1] < low[2]
-        label.new(bar_index[1], low[1], "DOL", color=cLiq,
+    if swingLow
+        label.new(bar_index, low, "DOL", color=cLiq,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
