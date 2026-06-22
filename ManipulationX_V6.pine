@@ -42,13 +42,13 @@ bool nyKz = false
 bool lonKz = false
 
 if showKz
-    nyKzSess = time(timeframe.period, '0930-1600', 'America/New_York')
+    nyKzSess = time(timeframe.period, nySess, sessTz)
     nyKz := not na(nyKzSess)
     nyStart = na(nyKzSess[1]) and not na(nyKzSess)
     if nyStart
         label.new(bar_index, high, ' NY Open ', color = nyColor, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
     
-    lonKzSess = time(timeframe.period, '0300-1200', 'America/New_York')
+    lonKzSess = time(timeframe.period, lonSess, sessTz)
     lonKz := not na(lonKzSess)
     
     inNy := not na(nyKzSess)
