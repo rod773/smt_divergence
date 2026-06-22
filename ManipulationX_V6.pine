@@ -76,14 +76,16 @@ if lonOpenBar
 //  FVG DETECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-detectFVG(tf) =>
-    [hi, lo, op, cl, hi1, lo1] = request.security(syminfo.tickerid, tf, [high, low, open, close, high[1], low[1]])
-    [lo > hi1 and cl > op ? lo : na, lo > hi1 and cl > op ? hi1 : na,
-     hi < lo1 and cl < op ? lo1 : na, hi < lo1 and cl < op ? hi : na]
+// 3-bar FVG detection on higher timeframe
+fvgDetect(tf) =>
+    [hi, lo, hi2, lo2] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2]])
+    bullOk = lo > hi2
+    bearOk = hi < lo2
+    [bullOk ? lo : na, bullOk ? hi2 : na, bearOk ? lo2 : na, bearOk ? hi : na]
 
-[f15bT, f15bB, f15rT, f15rB] = detectFVG("15")
-[f1hbT, f1hbB, f1hrT, f1hrB] = detectFVG("60")
-[f4hbT, f4hbB, f4hrT, f4hrB] = detectFVG("240")
+[f15bT, f15bB, f15rT, f15rB] = fvgDetect("15")
+[f1hbT, f1hbB, f1hrT, f1hrB] = fvgDetect("60")
+[f4hbT, f4hbB, f4hrT, f4hrB] = fvgDetect("240")
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
 [m1hi, m1lo, m1op, m1cl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
@@ -96,46 +98,48 @@ bullIFVG = m1cl < m1op and m1cl < m1lo1 and close > m1hi1 and ifvgBody >= ifvgMi
 bearIFVG = m1cl > m1op and m1cl > m1hi1 and close < m1lo1 and ifvgBody >= ifvgMinSize
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SMT DIVERGENCE (swing-based, reduced signals)
+//  SMT DIVERGENCE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-smtHi = request.security(smtSymbol, timeframe.period, high)
-smtLo = request.security(smtSymbol, timeframe.period, low)
+// Pivot detection (2 left + 2 right bars)
+nqPl = ta.pivotlow(low, 2, 2)
+nqPh = ta.pivothigh(high, 2, 2)
+esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
+esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
 
-// 3-bar swing confirmation
-swingLow  = low < low[1] and low < low[2] and low < low[3]
-swingHigh = high > high[1] and high > high[2] and high > high[3]
-
-// Track previous swing values
-var float prevNqLow = na
-var float prevEsLow = na
-var float prevNqHigh = na
-var float prevEsHigh = na
+var float lastNqLo = na
+var float lastEsLo = na
+var float lastNqHi = na
+var float lastEsHi = na
 
 bullSMT = false
 bearSMT = false
 
-if swingLow
-    if not na(prevNqLow) and not na(prevEsLow) and low > prevNqLow and smtLo < prevEsLow
+if not na(nqPl)
+    esPv = ta.valuewhen(not na(esPl), esPl, 0)
+    if not na(lastNqLo) and not na(esPv) and nqPl > lastNqLo and esPv < lastEsLo
         bullSMT := true
-    prevNqLow := low
-    prevEsLow := smtLo
+    lastNqLo := nqPl
+    if not na(esPv)
+        lastEsLo := esPv
 
-if swingHigh
-    if not na(prevNqHigh) and not na(prevEsHigh) and high < prevNqHigh and smtHi > prevEsHigh
+if not na(nqPh)
+    esPv = ta.valuewhen(not na(esPh), esPh, 0)
+    if not na(lastNqHi) and not na(esPv) and nqPh < lastNqHi and esPv > lastEsHi
         bearSMT := true
-    prevNqHigh := high
-    prevEsHigh := smtHi
+    lastNqHi := nqPh
+    if not na(esPv)
+        lastEsHi := esPv
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LIQUIDITY LEVELS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if showLiq
-    if swingHigh
+    if not na(nqPh)
         label.new(bar_index, high, "DOL", color=cLiq,
          style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if swingLow
+    if not na(nqPl)
         label.new(bar_index, low, "DOL", color=cLiq,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
@@ -150,22 +154,21 @@ drawFvgBox(top, bot, bull, txt) =>
         yBot = math.min(top, bot)
         box.new(bar_index-1, yTop, bar_index, yBot, border_color=c, bgcolor=c)
         if fvgExtendTF
-            line.new(bar_index-1, yTop, bar_index+5, yTop, color=c, width=1, extend=extend.right)
-            line.new(bar_index-1, yBot, bar_index+5, yBot, color=c, width=1, extend=extend.right)
+            line.new(bar_index-1, yTop, bar_index, yTop, color=c, width=1, extend=extend.right)
+            line.new(bar_index-1, yBot, bar_index, yBot, color=c, width=1, extend=extend.right)
         if fvgShowText
-            label.new(bar_index, bull ? top : bot, txt, color=c,
-             style=bull ? label.style_label_up : label.style_label_down,
-             textcolor=color.white, size=size.tiny)
+            label.new(bar_index, (yTop + yBot) / 2, txt, color=c,
+             style=label.style_label_center, textcolor=color.white, size=size.tiny)
 
 if showFvg15
-    drawFvgBox(f15bT, f15bB, true, "15m")
-    drawFvgBox(f15rT, f15rB, false, "15m")
+    drawFvgBox(f15bT, f15bB, true, "15M FVG")
+    drawFvgBox(f15rT, f15rB, false, "15M FVG")
 if showFvg1h
-    drawFvgBox(f1hbT, f1hbB, true, "1h")
-    drawFvgBox(f1hrT, f1hrB, false, "1h")
+    drawFvgBox(f1hbT, f1hbB, true, "1H FVG")
+    drawFvgBox(f1hrT, f1hrB, false, "1H FVG")
 if showFvg4h
-    drawFvgBox(f4hbT, f4hbB, true, "4h")
-    drawFvgBox(f4hrT, f4hrB, false, "4h")
+    drawFvgBox(f4hbT, f4hbB, true, "4H FVG")
+    drawFvgBox(f4hrT, f4hrB, false, "4H FVG")
 
 // ─── IFVG Labels ─────────────────────────────────────────────────────────────
 if showIFVG and bullIFVG
@@ -203,7 +206,7 @@ if showContinuations
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    chk = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)"
+    chk = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence"
     label.new(bar_index, high, chk, color=color.new(#1a1a2e, 30),
      style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
 
