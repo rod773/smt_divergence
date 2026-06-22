@@ -168,10 +168,10 @@ if showFvg4h
     drawFvgBox(f4hrT, f4hrB, false, "4h")
 
 // ─── IFVG Labels ─────────────────────────────────────────────────────────────
-if showIFVG and bullIFVG and ifvgValid
+if showIFVG and bullIFVG
     label.new(bar_index, low, " IFVG", color=cIfvgBull,
      style=label.style_label_up, textcolor=color.white, size=size.tiny)
-if showIFVG and bearIFVG and ifvgValid
+if showIFVG and bearIFVG
     label.new(bar_index, high, " IFVG", color=cIfvgBear,
      style=label.style_label_down, textcolor=color.white, size=size.tiny)
 
