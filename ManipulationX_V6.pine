@@ -46,7 +46,7 @@ if showKz
     nyKz := not na(nyKzSess)
     nyStart = na(nyKzSess[1]) and not na(nyKzSess)
     if nyStart
-        label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
+        label.new(bar_index, high, ' NY Open ', color = nyColor, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
     
     lonKzSess = time(timeframe.period, '0300-1200', 'America/New_York')
     lonKz := not na(lonKzSess)
@@ -268,12 +268,12 @@ var int pEsHiBar = na
 var bSMT = false
 var sSMT = false
 
+nqPl = ta.pivotlow(low, 2, 2)
+nqPh = ta.pivothigh(high, 2, 2)
+esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
+esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
+
 if showSmt
-    nqPl = ta.pivotlow(low, 2, 2)
-    nqPh = ta.pivothigh(high, 2, 2)
-    esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
-    esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
-    
     bSMT := false
     sSMT := false
     
@@ -362,9 +362,9 @@ asiaHiSweep := barHiSweep or not na(sweepHiPrice)
 asiaLoSweep := barLoSweep or not na(sweepLoPrice)
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
+dolPh = ta.pivothigh(high, 4, 4)
+dolPl = ta.pivotlow(low, 4, 4)
 if showDol and (not dolNyOnly or inNy)
-    dolPh = ta.pivothigh(high, 4, 4)
-    dolPl = ta.pivotlow(low, 4, 4)
     dolMin = dolMinTicks * syminfo.mintick
     var float lastDolHi = na
     var float lastDolLo = na
