@@ -1,5 +1,5 @@
 //@version=5
-indicator("ManipulationX V.6", overlay=true, max_lines_count=300, max_labels_count=300, max_boxes_count=200)
+indicator("ManipulationX V.6", overlay=true, max_lines_count=500, max_labels_count=300, max_boxes_count=0)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15   = input.bool(true,  "Show 15m FVG")
@@ -33,7 +33,7 @@ lonSess = time(timeframe.period, "0300-1200", "America/New_York")
 lonKz = showKz and not na(lonSess)
 bgcolor(lonKz ? cKzLon : na)
 
-// ─── HTF FVG (time-aligned boxes, drawn once per HTF bar) ────────────────────
+// ─── HTF FVG (linefill = TradingView rectangle style) ────────────────────────
 fvgData(tf) =>
     [h, l, h2, l2, t] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2], time])
     bull = l > h2
@@ -45,23 +45,25 @@ fvgData(tf) =>
 [d1hb, d1hr, l1h, h21h, l21h, h1h, t1h, n1h] = fvgData("60")
 [d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData("240")
 
-drawFvgBox(t0, t1, yHi, yLo, c) =>
-    box.new(t0, yHi, t1, yLo, xloc=xloc.bar_time, border_color=c, bgcolor=c)
-    line.new(t0, yHi, t1, yHi, xloc=xloc.bar_time, color=c)
-    line.new(t0, yLo, t1, yLo, xloc=xloc.bar_time, color=c)
+drawFvgZone(yHi, yLo, c, lbl) =>
+    l1 = line.new(bar_index, yHi, bar_index, yHi, extend=extend.right, color=c, width=1)
+    l2 = line.new(bar_index, yLo, bar_index, yLo, extend=extend.right, color=c, width=1)
+    linefill.new(l1, l2, color.new(c, 80))
+    label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
+     style=label.style_label_center, textcolor=color.white, size=size.tiny)
 
-if showFvg15 and d15b[1] and n15 and not na(t15[1])
-    drawFvgBox(t15[1], t15, l15[1], h215[1], cFvgBull)
-if showFvg15 and d15r[1] and n15 and not na(t15[1])
-    drawFvgBox(t15[1], t15, l215[1], h15[1], cFvgBear)
-if showFvg1h and d1hb[1] and n1h and not na(t1h[1])
-    drawFvgBox(t1h[1], t1h, l1h[1], h21h[1], cFvgBull)
-if showFvg1h and d1hr[1] and n1h and not na(t1h[1])
-    drawFvgBox(t1h[1], t1h, l21h[1], h1h[1], cFvgBear)
-if showFvg4h and d4hb[1] and n4h and not na(t4h[1])
-    drawFvgBox(t4h[1], t4h, l4h[1], h24h[1], cFvgBull)
-if showFvg4h and d4hr[1] and n4h and not na(t4h[1])
-    drawFvgBox(t4h[1], t4h, l24h[1], h4h[1], cFvgBear)
+if showFvg15 and d15b[1] and n15
+    drawFvgZone(l15[1], h215[1], cFvgBull, "15M")
+if showFvg15 and d15r[1] and n15
+    drawFvgZone(l215[1], h15[1], cFvgBear, "15M")
+if showFvg1h and d1hb[1] and n1h
+    drawFvgZone(l1h[1], h21h[1], cFvgBull, "1H")
+if showFvg1h and d1hr[1] and n1h
+    drawFvgZone(l21h[1], h1h[1], cFvgBear, "1H")
+if showFvg4h and d4hb[1] and n4h
+    drawFvgZone(l4h[1], h24h[1], cFvgBull, "4H")
+if showFvg4h and d4hr[1] and n4h
+    drawFvgZone(l24h[1], h4h[1], cFvgBear, "4H")
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
 [mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
@@ -123,13 +125,13 @@ if showDol
         label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
-// ─── S/R Levels (pivot-based horizontal lines, max 30) ────────────────────────
+// ─── S/R Levels (solid horizontal rays, max 40) ──────────────────────────────
 var line[] srLines = array.new_line()
-drawSrLine(px) =>
-    l = line.new(bar_index, px, bar_index+20, px, color=color.new(#FFD600, 30), width=1,
-     extend=extend.right)
+drawSrRay(px) =>
+    l = line.new(bar_index, px, bar_index, px, extend=extend.right,
+     color=color.new(#FFD600, 20), width=2)
     array.push(srLines, l)
-    if array.size(srLines) > 30
+    if array.size(srLines) > 40
         l2 = array.shift(srLines)
         line.delete(l2)
 
@@ -137,9 +139,9 @@ if showSr
     srHi = ta.pivothigh(high, 3, 3)
     srLo = ta.pivotlow(low, 3, 3)
     if not na(srHi)
-        drawSrLine(srHi)
+        drawSrRay(srHi)
     if not na(srLo)
-        drawSrLine(srLo)
+        drawSrRay(srLo)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
