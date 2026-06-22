@@ -110,23 +110,6 @@ var float lastFinLo = na
 var bool lastFinHiHit = false
 var bool lastFinLoHit = false
 
-// Capture pre-update active session levels for sweep detection
-float activePrevHi = na
-float activePrevLo = na
-if showSweep
-    if not na(asiaH)
-        activePrevHi := na(activePrevHi) ? asiaH : math.max(activePrevHi, asiaH)
-        activePrevLo := na(activePrevLo) ? asiaL : math.min(activePrevLo, asiaL)
-    if not na(sydH)
-        activePrevHi := na(activePrevHi) ? sydH : math.max(activePrevHi, sydH)
-        activePrevLo := na(activePrevLo) ? sydL : math.min(activePrevLo, sydL)
-    if not na(lonH)
-        activePrevHi := na(activePrevHi) ? lonH : math.max(activePrevHi, lonH)
-        activePrevLo := na(activePrevLo) ? lonL : math.min(activePrevLo, lonL)
-    if not na(nyH)
-        activePrevHi := na(activePrevHi) ? nyH : math.max(activePrevHi, nyH)
-        activePrevLo := na(activePrevLo) ? nyL : math.min(activePrevLo, nyL)
-
 if showSessions and showSessBoxes
     if entered(asiaIn)
         asiaH := high
@@ -361,7 +344,7 @@ if dLoSweep
 float sweepHiPrice = na
 float sweepLoPrice = na
 
-// Session level sweeps: highest swept high (red) + lowest swept low (green)
+// Session level sweeps: only the most recently completed session's final levels
 if showSweep
     if not lastFinHiHit and not na(lastFinHi) and high > lastFinHi + swp and close < lastFinHi
         lastFinHiHit := true
@@ -369,12 +352,6 @@ if showSweep
     if not lastFinLoHit and not na(lastFinLo) and low < lastFinLo - swp and close > lastFinLo
         lastFinLoHit := true
         sweepLoPrice := lastFinLo
-    if not na(activePrevHi) and high > activePrevHi + swp and close < activePrevHi
-        if na(sweepHiPrice) or activePrevHi > sweepHiPrice
-            sweepHiPrice := activePrevHi
-    if not na(activePrevLo) and low < activePrevLo - swp and close > activePrevLo
-        if na(sweepLoPrice) or activePrevLo < sweepLoPrice
-            sweepLoPrice := activePrevLo
 
 // Draw at most one label per direction, at the actual swept level price
 if not na(sweepHiPrice)
