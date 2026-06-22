@@ -146,17 +146,23 @@ asiaEnd = not na(asiaSess[1]) and na(asiaSess)
 
 var float asiaHi = na
 var float asiaLo = na
+var bool asiaHiHit = false
+var bool asiaLoHit = false
 asiaClosed = na(asiaSess) and not na(asiaHi)
 
 if asiaNew
     asiaHi := high
     asiaLo := low
+    asiaHiHit := false
+    asiaLoHit := false
 if not na(asiaSess) and not na(asiaHi)
     asiaHi := math.max(asiaHi, high)
     asiaLo := math.min(asiaLo, low)
 
 var float lonHi = na
 var float lonLo = na
+var bool lonHiHit = false
+var bool lonLoHit = false
 lonNew = na(lonSess[1]) and not na(lonSess)
 lonEnd = not na(lonSess[1]) and na(lonSess)
 lonClosed = na(lonSess) and not na(lonHi)
@@ -164,6 +170,8 @@ lonClosed = na(lonSess) and not na(lonHi)
 if lonNew
     lonHi := high
     lonLo := low
+    lonHiHit := false
+    lonLoHit := false
 if not na(lonSess) and not na(lonHi)
     lonHi := math.max(lonHi, high)
     lonLo := math.min(lonLo, low)
@@ -176,21 +184,29 @@ if showSweep and lonEnd and not na(lonHi)
     line.new(bar_index, lonHi, bar_index, lonHi, color=color.new(#FFD600, 30), width=1, extend=extend.right)
     line.new(bar_index, lonLo, bar_index, lonLo, color=color.new(#FFD600, 30), width=1, extend=extend.right)
 
-// Detect sweeps only on completed sessions (not while forming)
-if showSweep
-    swp = sweepTicks * syminfo.mintick
-    if asiaClosed and high > asiaHi + swp and close < asiaHi
-        label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
-         style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if asiaClosed and low < asiaLo - swp and close > asiaLo
-        label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
-         style=label.style_label_up, textcolor=color.white, size=size.tiny)
-    if lonClosed and high > lonHi + swp and close < lonHi
-        label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
-         style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if lonClosed and low < lonLo - swp and close > lonLo
-        label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
-         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+// Detect sweeps (once per level per session)
+swp = showSweep ? sweepTicks * syminfo.mintick : na
+asiaHiSweep = showSweep and asiaClosed and not asiaHiHit and high > asiaHi + swp and close < asiaHi
+asiaLoSweep = showSweep and asiaClosed and not asiaLoHit and low < asiaLo - swp and close > asiaLo
+lonHiSweep  = showSweep and lonClosed and not lonHiHit and high > lonHi + swp and close < lonHi
+lonLoSweep  = showSweep and lonClosed and not lonLoHit and low < lonLo - swp and close > lonLo
+
+if asiaHiSweep
+    label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
+     style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    asiaHiHit := true
+if asiaLoSweep
+    label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
+     style=label.style_label_up, textcolor=color.white, size=size.tiny)
+    asiaLoHit := true
+if lonHiSweep
+    label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30),
+     style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    lonHiHit := true
+if lonLoSweep
+    label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30),
+     style=label.style_label_up, textcolor=color.white, size=size.tiny)
+    lonLoHit := true
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
@@ -230,14 +246,9 @@ if barstate.islast
      style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
-bSweepAsia = asiaClosed and high > asiaHi + sweepTicks * syminfo.mintick and close < asiaHi
-sSweepAsia = asiaClosed and low < asiaLo - sweepTicks * syminfo.mintick and close > asiaLo
-bSweepLon  = lonClosed and high > lonHi + sweepTicks * syminfo.mintick and close < lonHi
-sSweepLon  = lonClosed and low < lonLo - sweepTicks * syminfo.mintick and close > lonLo
-
 alertcondition(bSMT, "Bullish SMT")
 alertcondition(sSMT, "Bearish SMT")
 alertcondition(bIFVG, "Bullish IFVG")
 alertcondition(sIFVG, "Bearish IFVG")
-alertcondition(bSweepAsia or bSweepLon, "Bearish Sweep")
-alertcondition(sSweepAsia or sSweepLon, "Bullish Sweep")
+alertcondition(asiaHiSweep or lonHiSweep, "Bearish Sweep")
+alertcondition(asiaLoSweep or lonLoSweep, "Bullish Sweep")
