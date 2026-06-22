@@ -64,9 +64,7 @@ bgcolor(lonKz ? cKzLon : na)
 // ─── Session Boxes (from sessions1.pine) ──────────────────────────────────────
 bool showSessBoxes = timeframe.in_seconds() < 14400
 
-styleFromStr(str) =>
-    str == 'dashed' ? line.style_dashed : str == 'dotted' ? line.style_dotted : line.style_solid
-int sessLine = styleFromStr(sessLineStyle)
+sessLine = sessLineStyle == 'dashed' ? line.style_dashed : sessLineStyle == 'dotted' ? line.style_dotted : line.style_solid
 
 inSession(sess) =>
     not na(time(timeframe.period, sess + ':1234567', sessTz))
@@ -104,56 +102,88 @@ var box nyBox = na
 
 if showSessions and showSessBoxes
     if entered(asiaIn)
-        asiaH := high; asiaL := low; asiaStart := bar_index
+        asiaH := high
+        asiaL := low
+        asiaStart := bar_index
         asiaBox := box.new(asiaStart, asiaH, bar_index, asiaL, xloc = xloc.bar_index, border_color = asiaColor, bgcolor = color.new(asiaColor, sessTransp))
         line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
     if not na(asiaBox)
         if asiaIn
-            asiaH := math.max(asiaH, high); asiaL := math.min(asiaL, low)
-            box.set_top(asiaBox, asiaH); box.set_bottom(asiaBox, asiaL); box.set_right(asiaBox, bar_index)
+            asiaH := math.max(asiaH, high)
+            asiaL := math.min(asiaL, low)
+            box.set_top(asiaBox, asiaH)
+            box.set_bottom(asiaBox, asiaL)
+            box.set_right(asiaBox, bar_index)
         if exited(asiaIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
             label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
-            asiaH := na; asiaL := na; asiaStart := na; asiaBox := na
+            asiaH := na
+            asiaL := na
+            asiaStart := na
+            asiaBox := na
 
     if entered(sydIn)
-        sydH := high; sydL := low; sydStart := bar_index
+        sydH := high
+        sydL := low
+        sydStart := bar_index
         sydBox := box.new(sydStart, sydH, bar_index, sydL, xloc = xloc.bar_index, border_color = sydColor, bgcolor = color.new(sydColor, sessTransp))
         line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
     if not na(sydBox)
         if sydIn
-            sydH := math.max(sydH, high); sydL := math.min(sydL, low)
-            box.set_top(sydBox, sydH); box.set_bottom(sydBox, sydL); box.set_right(sydBox, bar_index)
+            sydH := math.max(sydH, high)
+            sydL := math.min(sydL, low)
+            box.set_top(sydBox, sydH)
+            box.set_bottom(sydBox, sydL)
+            box.set_right(sydBox, bar_index)
         if exited(sydIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
             label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
-            sydH := na; sydL := na; sydStart := na; sydBox := na
+            sydH := na
+            sydL := na
+            sydStart := na
+            sydBox := na
 
     if entered(londonIn)
-        lonH := high; lonL := low; lonStart := bar_index
+        lonH := high
+        lonL := low
+        lonStart := bar_index
         lonBox := box.new(lonStart, lonH, bar_index, lonL, xloc = xloc.bar_index, border_color = lonColor, bgcolor = color.new(lonColor, sessTransp))
         line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
     if not na(lonBox)
         if londonIn
-            lonH := math.max(lonH, high); lonL := math.min(lonL, low)
-            box.set_top(lonBox, lonH); box.set_bottom(lonBox, lonL); box.set_right(lonBox, bar_index)
+            lonH := math.max(lonH, high)
+            lonL := math.min(lonL, low)
+            box.set_top(lonBox, lonH)
+            box.set_bottom(lonBox, lonL)
+            box.set_right(lonBox, bar_index)
         if exited(londonIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
             label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
-            lonH := na; lonL := na; lonStart := na; lonBox := na
+            lonH := na
+            lonL := na
+            lonStart := na
+            lonBox := na
 
     if entered(nySessIn)
-        nyH := high; nyL := low; nyStart := bar_index
+        nyH := high
+        nyL := low
+        nyStart := bar_index
         nyBox := box.new(nyStart, nyH, bar_index, nyL, xloc = xloc.bar_index, border_color = nyColor, bgcolor = color.new(nyColor, sessTransp))
         line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
     if not na(nyBox)
         if nySessIn
-            nyH := math.max(nyH, high); nyL := math.min(nyL, low)
-            box.set_top(nyBox, nyH); box.set_bottom(nyBox, nyL); box.set_right(nyBox, bar_index)
+            nyH := math.max(nyH, high)
+            nyL := math.min(nyL, low)
+            box.set_top(nyBox, nyH)
+            box.set_bottom(nyBox, nyL)
+            box.set_right(nyBox, bar_index)
         if exited(nySessIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
             label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
-            nyH := na; nyL := na; nyStart := na; nyBox := na
+            nyH := na
+            nyL := na
+            nyStart := na
+            nyBox := na
 
 // ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
 fvgDraw(tf, cBull, cBear, lbl) =>
@@ -213,16 +243,12 @@ if showSmt
     bSMT := false
     sSMT := false
     
-    if not na(esPl)
-        pEsLo := esPl
-        pEsLoBar := bar_index
-    if not na(esPh)
-        pEsHi := esPh
-        pEsHiBar := bar_index
+    eLo = ta.valuewhen(not na(esPl), esPl, 0)
+    eLoBar = ta.valuewhen(not na(esPl), bar_index, 0)
+    eHi = ta.valuewhen(not na(esPh), esPh, 0)
+    eHiBar = ta.valuewhen(not na(esPh), bar_index, 0)
     
     if not na(nqPl)
-        eLo = ta.valuewhen(not na(esPl), esPl, 0)
-        eLoBar = ta.valuewhen(not na(esPl), bar_index, 0)
         if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
             bSMT := true
             line.new(pNqLoBar, pNqLo, bar_index, nqPl, color = cSmtBull, width = 2)
@@ -230,15 +256,19 @@ if showSmt
             label.new(bar_index, low, ' SMT', color = cSmtBull, style = label.style_label_up, textcolor = color.white, size = size.small)
         pNqLo := nqPl
         pNqLoBar := bar_index
+        pEsLo := eLo
+        pEsLoBar := eLoBar
     
     if not na(nqPh)
-        eHi = ta.valuewhen(not na(esPh), esPh, 0)
-        eHiBar = ta.valuewhen(not na(esPh), bar_index, 0)
         if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
             sSMT := true
             line.new(pNqHiBar, pNqHi, bar_index, nqPh, color = cSmtBear, width = 2)
             line.new(pEsHiBar, pEsHi, eHiBar, eHi, color = cSmtBull, width = 2)
             label.new(bar_index, high, ' SMT', color = cSmtBear, style = label.style_label_down, textcolor = color.white, size = size.small)
+        pNqHi := nqPh
+        pNqHiBar := bar_index
+        pEsHi := eHi
+        pEsHiBar := eHiBar
 else
     bSMT := false
     sSMT := false
