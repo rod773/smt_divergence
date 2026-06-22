@@ -1,0 +1,845 @@
+If you live anywhere in the world that
+
+can trade the New York session, then
+
+please watch this video. The strategy
+
+I'm going to be showing you guys is like
+
+taking candy from a baby, and it happens
+
+almost every single day. I think
+
+literally every single trading day this
+
+week this exact system played out at the
+
+exact same time. I've taught this exact
+
+same strategy to brand new traders. Here
+
+are just a few results from today, guys.
+
+Okay, I'm not even cherry-picking. This
+
+is from my live chat in the Discord
+
+today. People getting payouts left and
+
+right using this model because it is
+
+mechanical. Now, unlike these other fake
+
+YouTube gurus that don't even trade
+
+live, I'm going to actually show you
+
+guys real examples I took on stream
+
+using the strategy just to give you guys
+
+a better idea of what this will look
+
+like. So, I actually did not trade today
+
+because it was Friday. Um I did tape
+
+read this trade. I said this would
+
+probably play out, which obviously it
+
+did because the strategy is too
+
+powerful. But, let us go to yesterday,
+
+okay? Okay, so let's break this down
+
+step by step. So, I only trade one
+
+session, which is the New York session,
+
+okay? I personally trade New York
+
+session. That's what my students trade
+
+as well. And honestly, guys, I would
+
+recommend only trading one session at
+
+market open, okay? So, at 9:30 a.m.
+
+Eastern. So, what we're doing before
+
+market opens at 9:30 is we're marking
+
+out our draws on liquidity. Do we have
+
+any clear and obvious draws on liquidity
+
+that we are heading towards? So, a draw
+
+on liquidity is just a level that price
+
+wants to see. So, I see we have this
+
+high all the way up here. We also have
+
+this equal high here as well. An equal
+
+high is one of my favorite draws on
+
+liquidity. We also have this external
+
+low all the way down to the left here.
+
+So, that is all we are doing. We are
+
+marking out our draws on liquidity. Do
+
+we know what price is going to do yet?
+
+Absolutely not. And also, we are going
+
+to mark out our fair value gaps. Now,
+
+I'm a big advocate for trading higher
+
+time frame fair value gaps, otherwise
+
+known as higher time frame delivery.
+
+Meaning, even though I'm looking for an
+
+entry on a 1 to 3-minute time frame, I
+
+want to see price delivering from a
+
+higher time frame fair value gap. I'm
+
+going to turn on the Manipulation X
+
+indicator. If you guys didn't know, I've
+
+coded this entire strategy into its own
+
+indicator. So, I'm going to turn on the
+
+1-hour and the 15-minute fair value
+
+gaps. You guys do not need to use my
+
+indicator for doing this. It just saves
+
+me time. So, step number one, we're
+
+waiting for New York session to open.
+
+Number two, we're marking out our draws
+
+on liquidity and our 15-minute, okay,
+
+15-minute and 1-hour fair value gaps.
+
+This is for our delivery. So, I can see
+
+here on my chart that we had swept this
+
+most internal low during pre-market and
+
+we are holding a 15-minute bullish fair
+
+value gap. On the other side of the
+
+spectrum, we are also rejecting from
+
+this 15-minute bearish fair value gap.
+
+So, guys, I don't want to enter any sort
+
+of short positions into this bullish
+
+gap, but I also don't want to enter any
+
+sort of long positions into this bearish
+
+gap. Ideally, guys, for an A+ setup what
+
+I'm looking at now would be a sweep of
+
+this external liquidity into this
+
+untapped 1-hour fair value gap. This
+
+would be my ideal scenario, but as you
+
+guys know, trading is not always ideal
+
+scenarios. We have to adapt. So, this
+
+gives me a very generic idea of what I
+
+am looking for, okay? As long as we are
+
+holding this 15-minute bullish gap, we
+
+could potentially see higher. As long as
+
+we are holding this 15-minute bearish
+
+gap, we can potentially see lower. At
+
+this point in time, because we have
+
+taken out this external low and we are
+
+delivering from a 15-minute bullish gap
+
+with these draws on liquidity higher and
+
+we are in an uptrend, I would rather
+
+look for long positions. Again, doesn't
+
+mean I will 100% take a long position,
+
+but I'd rather look for long positions.
+
+If you guys are still watching this
+
+video, pay attention. This is where
+
+things get good. Also, guys, if you want
+
+to trade this exact strategy live with
+
+me every single morning, Monday through
+
+Friday at 9:30 a.m. Eastern, then make
+
+sure to click the first link in the
+
+description below. Unlike every other
+
+trading educator on YouTube, I actually
+
+practice what I preach. I'm actually
+
+trading live every single day. Step
+
+number three is going to be our entry
+
+model, which is going to be an inverse
+
+fair value gap or an IFVG. So, I'm
+
+always trading on a 1-minute time frame
+
+at least to start to look for these
+
+IFVGs. I also forgot to mention, but I
+
+do not trade the first 5 minutes of
+
+market open. I need to let that initial
+
+manipulation move play out. We are about
+
+5 minutes into market open. What else do
+
+you guys notice here? We have all of
+
+this engineered liquidity. You guys see
+
+all these highs here, okay? These are
+
+engineered highs, okay? The market
+
+makers, the algorithms, they
+
+purposefully engineer all of these sort
+
+of equal highs or trend line liquidity
+
+in order for them to pick up more orders
+
+down here and eventually run these highs
+
+towards our external draws on liquidity.
+
+So, take note of this formation, guys.
+
+We have 9:30 market opens, we manipulate
+
+lower, okay, inside of a higher time
+
+frame bullish fair value gap, and we
+
+have all of these highs above us, okay?
+
+So, at this point in time in the
+
+Discord, I said, "Guys, I'm looking for
+
+a long position as soon as I see an
+
+inverse fair value gap." So, we're going
+
+to let price play out, and you can see
+
+here we did not get our entry model.
+
+There was no bearish fair value gap for
+
+us to inverse. And guys, this is
+
+something very, very important that I
+
+want you guys to take note of. These
+
+steps right here is my New York session
+
+trading system. However, there's a few
+
+other things I add to push this from
+
+like a 65% to 70% win rate all the way
+
+up to a 75% 80% win rate for a true A+
+
+setup. This is incorporating something
+
+called an SMT divergence, okay? This is
+
+something I've also coded into the
+
+Manipulation X indicator, so this will
+
+also be down in the description below if
+
+you guys are interested, okay? An SMT
+
+divergence is one of the most powerful
+
+confluences you can have when you are
+
+day trading Nasdaq. If we take a
+
+side-by-side look at the S&P 500,
+
+because Nasdaq and the S&P 500 are
+
+correlated assets, what do you notice
+
+here on ES from this low, which is this
+
+low right here on Nasdaq, to this low
+
+right here at 9:42? You see how ES ended
+
+up taking out this low, okay? Took out
+
+the 8:30 a.m. low. Whereas on NQ, price
+
+did not take out this low. From the same
+
+exact starting point, ES ended up taking
+
+out this low, creating a swing failure
+
+pattern, whereas Nasdaq did not. Nasdaq
+
+actually created a higher low. So, we
+
+would call this discrepancy between
+
+these two correlated assets a bullish
+
+SMT divergence. Whenever I have this
+
+formation here, where price is
+
+delivering from a 15-minute fair value
+
+gap, we have draws on liquidity higher
+
+after that initial market open
+
+manipulation, and we have an SMT
+
+divergence, this is a textbook textbook
+
+trade. So, we are going to let the price
+
+play out.
+
+And boom, there is our inverse fair
+
+value gap on this candle right here, and
+
+this was our entry inside of the Discord
+
+with our stop loss below the previous
+
+candle body. Break even at this most
+
+internal structure high, and guys, we
+
+were just targeting this external draw
+
+for the full TP on this trade with a
+
+very small partial right here as well.
+
+So, take note of the setup, guys. We
+
+have New York session open, price
+
+manipulates lower. Think about logically
+
+what's happening here during this move
+
+down, okay? We got rid of the early
+
+buyers who just randomly entered a long.
+
+We waited for price to tap into this
+
+15-minute gap and create a bullish SMT
+
+with ES. This is our manipulation leg
+
+right here, meaning we took out all of
+
+the retail buyers, right? Cuz they're
+
+putting their stop losses below this
+
+low. So, we take out all the retail, we
+
+immediately reverse it on them, gives us
+
+our inverse fair value gap, which is our
+
+entry model within a few candles. Really
+
+nice displacement candle here, lots of
+
+bullish momentum. Very clear break even,
+
+draws liquidity higher. This is an A+
+
+setup, guys. Literally within a few
+
+minutes, guys, we were done for the day.
+
+That's it. Okay, let's go to the day
+
+before, which was Wednesday, June 10th.
+
+Now, before we get into this, guys, make
+
+sure to leave a like if you guys are
+
+finding value. So, we have Wednesday,
+
+same exact sort of setup here. So,
+
+market opens right at 9:30. What do we
+
+do at market open? Well, we open low
+
+into a 15-minute bullish fair value gap,
+
+okay? So, this is our fair value gap,
+
+and we also have some equal highs here
+
+as well. Same exact setup as Thursday,
+
+guys, right? Perfect equal high, we're
+
+delivering from a 15-minute, we have
+
+that 9:30 open low, and watch what
+
+happens here, guys, okay? We're waiting,
+
+and boom, instant V-shape reversal. We
+
+have a very small 1-minute, actually on
+
+the 30-second it was a little bit more
+
+visible, so we had a very small
+
+30-second, which isn't ideal. Normally,
+
+I like to take those very obvious
+
+V-shape inversions, but this was also a
+
+valid long position here on this
+
+30-second. Stop loss below this
+
+displacement candle low, break even at
+
+this equal high, and I'm just going to
+
+target this external high as my full TP
+
+for a 1.5 RR, and again, done within a
+
+few minutes. Okay, let's go to the day
+
+before that. Okay, so here we have
+
+Tuesday. Okay, so the market opens low.
+
+We have bullish SMTs. We're still within
+
+5 minutes of market open, so I didn't
+
+personally take this long position. We
+
+didn't have any sort of higher time
+
+frame delivery on this trade in
+
+particular. Now, watch what happens here
+
+as we approach that 9:50 10:00 a.m.
+
+window. We manipulate all of these highs
+
+right here, okay? And check this out,
+
+guys. On a daily time frame, we are
+
+inside of a daily bearish fair value
+
+gap. So, I also like to look at the
+
+daily fair value gaps, meaning we have
+
+bearish delivery on this trade here. And
+
+what did I say at the beginning of this
+
+video? You never want to look for longs
+
+inside of a bearish fair value gap or
+
+look for shorts inside of a a bullish
+
+fair value gap. And take a look at all
+
+of this trendline liquidity we are now
+
+building to the downside. We even have
+
+this relative equal low here as well.
+
+So, all I was watching for on this day
+
+was a 5-minute inverse fair value gap
+
+because that was the highest time frame
+
+inverse on the leg. So, whenever I have,
+
+let's say, a 2-minute, a 3-minute, and a
+
+5-minute bullish fair value gap, I
+
+always wait for the highest time frame
+
+fair value gap in that manipulation leg
+
+up to get inverse before going short.
+
+So, this is where we entered the short
+
+position inside of the live as soon as
+
+we got that V-shape closing back below
+
+that bullish fair value gap, telling us
+
+that, "Hey, order flow has shifted from
+
+bullish to bearish." And look at the
+
+time, guys. Right inside of that 9:50
+
+macro window, when we can expect some
+
+sort of reversal or some volume to come
+
+into the market. And we were targeting
+
+the London low as the full TP. Check
+
+this one out, guys. Boom, instant TP,
+
+and this one ran even further as well.
+
+So, remember the rules from the
+
+beginning of the video, okay? New York
+
+session, 9:30 a.m. Eastern, you're going
+
+to mark out your clear draws on
+
+liquidity, such as equal lows, trend
+
+line liquidity, etc. You're also going
+
+to mark out your higher time frame fair
+
+value gaps, so your 15-minute, your
+
+1-hour. You can even look at the 4-hour
+
+and daily as well. Wait for one side of
+
+the market to get manipulated during the
+
+first 10 to 20 minutes, then look for a
+
+V-shaped IFEG and SMT divergence for
+
+more confluence is great as well, and
+
+enter the trade targeting your DOL. It
+
+is that simple, guys. We can continue to
+
+go back as far as you guys want, and I
+
+will show you the same exact setup
+
+playing like almost every single day.
+
+Let's go to Monday. Same exact thing,
+
+guys, okay? So, Monday opens. What do we
+
+do when market opens, okay? We dump
+
+lower right into our higher time frame
+
+delivery. So, this is our 1-hour and a
+
+15-minute bullish gap, and we have all
+
+of these equal highs above, all this
+
+trend line liquidity, whatever you want
+
+to call it. Right at 10:00 a.m., guys,
+
+look at the time on this one, okay?
+
+Right at 10:00 a.m., we tag into this
+
+higher time frame fair value gap. We
+
+sweep this external low. No bullish SMT,
+
+but guys, check this out. We have equal
+
+highs above. I mean, just textbook
+
+setup, V-shaped inversion. Our indicator
+
+alerted this one as well. Let price play
+
+out
+
+and break even, and then TP. Doesn't get
+
+much easier than that, guys. We can even
+
+go to today as well, okay? So, market
+
+opens low. We fail this bearish fair
+
+value gap here, so no inverse. If we did
+
+get an inverse here, this would be a
+
+long position I would try to take, but
+
+there was no inverse fair value gap
+
+here, so no trade. We reject this level,
+
+come all the way down taking out the
+
+London low. We sweep London low right
+
+into that 10:00 a.m. macro. Right, look
+
+at the time, right? 9:40 a.m. Starting
+
+to go up, still rejecting, wait for one
+
+more candle. There is the candle closure
+
+above this bearish fair value gap right
+
+at 10:00 a.m., right? So, look when we
+
+get this reversal, guys, right into that
+
+10:00 a.m. macro. Tons of volume behind
+
+this candle, very clear break even
+
+target right here, and we have equal
+
+highs all the way up here that we can
+
+target as our take profit as well. And
+
+probably a TP one on this one into a
+
+break even trade. What I'm trying to
+
+show you guys is that a strategy rarely
+
+loses. If you actually know what to look
+
+for, if you're waiting for that first
+
+initial manipulation move to happen, you
+
+have a clear draw on liquidity, you have
+
+higher time frame delivery, you have a
+
+V-shaped inversion. I mean, guys, this
+
+plays out like almost every day. Every
+
+single day this week I've showed you
+
+guys. This is from this week. I'm not
+
+going back. I'm not cherry-picking data.
+
+This is, you know, from today, from
+
+yesterday, from the day before, trades
+
+we've actually taken on stream. I'm
+
+telling you, if you guys can actually
+
+just implement this, once you start
+
+reading the market like this, you will
+
+never go back to any other trade system.
+
+My risk reward is not the highest. I'm
+
+not claiming I hit 1:5, 1:10 risk reward
+
+trades. I mainly go for base hit trades,
+
+but I have a 70% plus win rate because
+
+I'm waiting for all of these confluences
+
+to line up. So, that's my entire
+
+checklist. This is my entire strategy
+
+given to you guys for free. Most of you
+
+guys are like 90% there in your trading.
+
+You see other people making consistent
+
+profits online trading. You know it's
+
+legit. You're just missing that last
+
+10%. Then, I got you guys, okay? The
+
+missing piece might be your trading
+
+strategy, but it's probably not. It's
+
+probably the way you're going about
+
+trading prop firms. I have developed an
+
+entire A-through-Z prop firm system that
+
+is scaling brand new traders from zero
+
+to 5K plus per month in the span of one
+
+singular month. I can almost guarantee
+
+there's no one else on YouTube that has
+
+the system as dialed as I do, to the
+
+point where you can pass evals within a
+
+few days, get funded, and start getting
+
+real payouts within the next few weeks.
+
+Now, obviously, this is a strategy that
+
+I use when I trade prop firms, but
+
+there's an entire system behind it. If
+
+you guys are interested in that, I'm
+
+going to leave the link to the pro group
+
+down in the description below. Not only
+
+do I go live with you guys every single
+
+morning, Monday through Friday, to trade
+
+alongside you, so I'm not just telling
+
+you what to do. I'm actually showing you
+
+guys in real time. I also will give you
+
+my A-through-Z prop firm scaling guide,
+
+which is super clutch. I know for a fact
+
+that's what most of you guys who are
+
+watching this are missing. So, if you're
+
+serious about taking your trading to the
+
+next level, I'll leave that down in the
+
+description below. But, that's going to
+
+be it for this video, guys. Ton of sauce
+
+this one, guys. Make sure to hit that
+
+subscribe button, as well. That's going
+
+to do it for me. I'll see you guys next
+
+video.
+
+

@@ -1,0 +1,219 @@
+//@version=5
+indicator("ManipulationX V.6", overlay=true, max_bars_back=500, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── IFVG ────────────────────────────────────────────────────────────────────
+showIFVG       = input.bool(true,  "Show iFVGs")
+ifvgStyle      = input.string("Solid", "IFVG Line Style", options=["Solid", "Dashed", "Dotted"])
+ifvgWidth      = input.int(2, "IFVG Line Width", minval=1, maxval=5)
+ifvgMinSize    = input.float(0.0, "Minimum Size", step=0.25)
+ifvgSizeFilter = input.bool(true, "Size Filter")
+
+// ─── HTF FVG ─────────────────────────────────────────────────────────────────
+showFvg15      = input.bool(true,  "Show 15m FVG")
+showFvg1h      = input.bool(true,  "Show 1h FVG")
+showFvg4h      = input.bool(false, "Show 4h FVG")
+fvgMethod      = input.string("100%", "Mitigation Method", options=["50%", "100%", "Full Wick"])
+fvgInternal    = input.bool(true,  "Show Internal")
+fvgShowText    = input.bool(true,  "Show Text")
+fvgExtendTF    = input.bool(true,  "Extend FVG")
+fvgMaxCount    = input.int(50, "Max FVGs", minval=5, maxval=200)
+
+// ─── Liquidity ───────────────────────────────────────────────────────────────
+showLiq        = input.bool(true,  "Show Draws on Liquidity")
+liqLook        = input.int(50, "Liquidity Lookback", minval=10, maxval=300)
+
+// ─── SMT ─────────────────────────────────────────────────────────────────────
+showSmt        = input.bool(true,  "Show SMT Divergence")
+smtSymbol      = input.symbol("ES1!", "SMT Comparison Symbol")
+
+// ─── Killzones ───────────────────────────────────────────────────────────────
+showKz         = input.bool(true, "Use Killzones")
+showNyKz       = input.bool(true, "New York KZ")
+nyStr          = input.string("09:30-16:00", "NY Hours (HH:MM-HH:MM)")
+showLonKz      = input.bool(false, "London KZ")
+lonStr         = input.string("03:00-12:00", "London Hours (HH:MM-HH:MM)")
+
+// ─── Reversals / Continuations ───────────────────────────────────────────────
+showReversals  = input.bool(true, "Show Reversals")
+showContinuations = input.bool(false, "Show Continuations")
+
+// ─── Colors ──────────────────────────────────────────────────────────────────
+cFvgBull       = input.color(color.new(#00ff88, 72), "Bullish FVG")
+cFvgBear       = input.color(color.new(#ff4444, 72), "Bearish FVG")
+cIfvgBull      = input.color(color.new(#00E676, 20), "Bullish IFVG")
+cIfvgBear      = input.color(color.new(#FF1744, 20), "Bearish IFVG")
+cSmtBull       = input.color(#2196F3, "Bullish SMT")
+cSmtBear       = input.color(#FF9800, "Bearish SMT")
+cLiq           = input.color(#9C27B0, "Liquidity Label")
+cKz            = input.color(color.new(#546E7A, 82), "Killzone")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  KILLZONE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+drawKZ(labelTxt, rangeStr, col) =>
+    parts   = str.split(rangeStr, "-")
+    if array.size(parts) == 2
+        oH = int(str.tonumber(str.substring(array.get(parts, 0), 0, 2)))
+        oM = int(str.tonumber(str.substring(array.get(parts, 0), 3, 5)))
+        cH = int(str.tonumber(str.substring(array.get(parts, 1), 0, 2)))
+        cM = int(str.tonumber(str.substring(array.get(parts, 1), 3, 5)))
+        if not na(oH) and not na(oM) and not na(cH) and not na(cM)
+            tOpen  = timestamp("America/New_York", year, month, dayofmonth, oH, oM)
+            tClose = timestamp("America/New_York", year, month, dayofmonth, cH, cM)
+            inZone = time >= tOpen and time < tClose
+            if inZone and barstate.isconfirmed == false
+                box.new(bar_index, high*1.005, bar_index+1, low*0.995, border_color=col, bgcolor=col)
+            if time >= tOpen and time < tOpen + 120000
+                label.new(bar_index, high, labelTxt, color=col, style=label.style_label_lower_left,
+                 textcolor=color.white, size=size.small)
+
+if showKz
+    if showNyKz and nyStr != ""
+        drawKZ(" NY Open ", nyStr, cKz)
+    if showLonKz and lonStr != ""
+        drawKZ(" London ", lonStr, cKz)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FVG DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+detectFVG(tf) =>
+    [hi, lo, op, cl, hi1, lo1] = request.security(syminfo.tickerid, tf, [high, low, open, close, high[1], low[1]])
+    [lo > hi1 and cl > op ? lo : na, lo > hi1 and cl > op ? hi1 : na,
+     hi < lo1 and cl < op ? lo1 : na, hi < lo1 and cl < op ? hi : na]
+
+[f15bT, f15bB, f15rT, f15rB] = detectFVG("15")
+[f1hbT, f1hbB, f1hrT, f1hrB] = detectFVG("60")
+[f4hbT, f4hbB, f4hrT, f4hrB] = detectFVG("240")
+
+// ─── IFVG (1m) ───────────────────────────────────────────────────────────────
+[m1hi, m1lo, m1op, m1cl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
+m1hi1 = request.security(syminfo.tickerid, "1", high[1])
+m1lo1 = request.security(syminfo.tickerid, "1", low[1])
+
+// Bullish IFVG: red candle closes below prior low, then green candle closes up
+bullIFVG = m1cl < m1op and m1cl < m1lo1 and close > open
+bearIFVG = m1cl > m1op and m1cl > m1hi1 and close < open
+
+// Size filter
+ifvgSize = math.abs(close - open)
+ifvgValid = (not ifvgSizeFilter) or (ifvgSize >= ifvgMinSize)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SMT DIVERGENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+smtHi = request.security(smtSymbol, timeframe.period, high)
+smtLo = request.security(smtSymbol, timeframe.period, low)
+
+swL = low < low[1] and low <= low[2]
+swH = high > high[1] and high >= high[2]
+
+bullSMT = swL and low > low[2] and smtLo < smtLo[2]
+bearSMT = swH and high < high[2] and smtHi > smtHi[2]
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  LIQUIDITY LEVELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showLiq
+    eqhFound = false
+    eqlFound = false
+    for i = 3 to liqLook
+        if not eqhFound and high == high[i] and high > high[1]
+            label.new(bar_index[i], high[i], "EQH", color=cLiq,
+             style=label.style_label_down, textcolor=color.white, size=size.tiny)
+            eqhFound := true
+        if not eqlFound and low == low[i] and low < low[1]
+            label.new(bar_index[i], low[i], "EQL", color=cLiq,
+             style=label.style_label_up, textcolor=color.white, size=size.tiny)
+            eqlFound := true
+    // Recent swing
+    if high[1] > high and high[1] > high[2]
+        label.new(bar_index[1], high[1], "DOL", color=cLiq,
+         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    if low[1] < low and low[1] < low[2]
+        label.new(bar_index[1], low[1], "DOL", color=cLiq,
+         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FVG BOX DRAWING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+drawFvgBox(top, bot, bull, txt) =>
+    if not na(top) and not na(bot)
+        c = bull ? cFvgBull : cFvgBear
+        yTop = math.max(top, bot)
+        yBot = math.min(top, bot)
+        box.new(bar_index-1, yTop, bar_index, yBot, border_color=c, bgcolor=c)
+        if fvgExtendTF
+            line.new(bar_index-1, yTop, bar_index+5, yTop, color=c, width=1, extend=extend.right)
+            line.new(bar_index-1, yBot, bar_index+5, yBot, color=c, width=1, extend=extend.right)
+        if fvgShowText
+            label.new(bar_index, bull ? top : bot, txt, color=c,
+             style=bull ? label.style_label_up : label.style_label_down,
+             textcolor=color.white, size=size.tiny)
+
+if showFvg15
+    drawFvgBox(f15bT, f15bB, true, "15m")
+    drawFvgBox(f15rT, f15rB, false, "15m")
+if showFvg1h
+    drawFvgBox(f1hbT, f1hbB, true, "1h")
+    drawFvgBox(f1hrT, f1hrB, false, "1h")
+if showFvg4h
+    drawFvgBox(f4hbT, f4hbB, true, "4h")
+    drawFvgBox(f4hrT, f4hrB, false, "4h")
+
+// ─── IFVG Labels ─────────────────────────────────────────────────────────────
+if showIFVG and bullIFVG and ifvgValid
+    label.new(bar_index, low, " IFVG", color=cIfvgBull,
+     style=label.style_label_up, textcolor=color.white, size=size.tiny)
+if showIFVG and bearIFVG and ifvgValid
+    label.new(bar_index, high, " IFVG", color=cIfvgBear,
+     style=label.style_label_down, textcolor=color.white, size=size.tiny)
+
+// ─── SMT Labels ──────────────────────────────────────────────────────────────
+if showSmt and bullSMT
+    label.new(bar_index, low, " SMT ▲", color=cSmtBull,
+     style=label.style_label_up, textcolor=color.white, size=size.small)
+if showSmt and bearSMT
+    label.new(bar_index, high, " SMT ▼", color=cSmtBear,
+     style=label.style_label_down, textcolor=color.white, size=size.small)
+
+// ─── Reversal / Continuation Tags ────────────────────────────────────────────
+if showReversals
+    // V-shape reversal detection: sharp move down then immediate close above
+    vShapeRev = close > open and low < low[1] and close > low[1] + (high[1] - low[1]) * 0.5
+    if vShapeRev and bullIFVG
+        label.new(bar_index, low, " REV ▲", color=color.new(#FFD600, 30),
+         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+
+if showContinuations
+    contBull = close > open and close > high[1]
+    contBear = close < open and close < low[1]
+    if contBull
+        label.new(bar_index, low, " CONT ▲", color=color.new(#00BFA5, 30),
+         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+    if contBear
+        label.new(bar_index, high, " CONT ▼", color=color.new(#D50000, 30),
+         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+
+// ─── Checklist ───────────────────────────────────────────────────────────────
+if barstate.islast
+    chk = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)"
+    label.new(bar_index, high, chk, color=color.new(#1a1a2e, 30),
+     style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(bullSMT,  "Bullish SMT", "{{ticker}}: Bullish SMT divergence at {{close}}")
+alertcondition(bearSMT,  "Bearish SMT", "{{ticker}}: Bearish SMT divergence at {{close}}")
+alertcondition(bullIFVG, "Bullish IFVG", "{{ticker}}: Bullish IFVG entry signal at {{close}}")
+alertcondition(bearIFVG, "Bearish IFVG", "{{ticker}}: Bearish IFVG entry signal at {{close}}")
