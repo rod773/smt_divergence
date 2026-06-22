@@ -88,22 +88,27 @@ finalizeSession(SessionInfo this) =>
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
 var inNy = false
+bool nyKz = false
+bool lonKz = false
 
 if showKz
     nySess = time(timeframe.period, '0930-1600', 'America/New_York')
-    nyKz = not na(nySess)
+    nyKz := not na(nySess)
     nyStart = na(nySess[1]) and not na(nySess)
-    bgcolor(nyKz ? cKzNy : na)
     if nyStart
         label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
     
     lonSess = time(timeframe.period, '0300-1200', 'America/New_York')
-    lonKz = not na(lonSess)
-    bgcolor(lonKz ? cKzLon : na)
+    lonKz := not na(lonSess)
     
     inNy := not na(nySess)
 else
     inNy := false
+    nyKz := false
+    lonKz := false
+
+bgcolor(nyKz ? cKzNy : na)
+bgcolor(lonKz ? cKzLon : na)
 
 // ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
 fvgDraw(tf, cBull, cBear, lbl) =>
