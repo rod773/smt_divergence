@@ -1,52 +1,52 @@
-//@version=5
-indicator("ManipulationX V.6", overlay=true, max_lines_count=300, max_labels_count=300, max_boxes_count=150)
+//@version=6
+indicator('ManipulationX V.6', overlay = true, max_lines_count = 300, max_labels_count = 300, max_boxes_count = 150)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
-showFvg15   = input.bool(true,  "Show 15m FVG")
-showFvg1h   = input.bool(true,  "Show 1h FVG")
-showFvg4h   = input.bool(false, "Show 4h FVG")
-fvgMinTicks = input.int(8, "Min FVG Gap (ticks)", minval=1, maxval=50)
-fvgNyOnly   = input.bool(true,  "FVG only during NY session")
-showIFVG    = input.bool(true,  "Show iFVGs")
-showSmt     = input.bool(true,  "Show SMT Divergence")
-smtSymbol   = input.symbol("MES1!", "SMT Symbol")
-showSweep   = input.bool(true,  "Show Liquidity Sweeps")
-sweepTicks  = input.int(2, "Sweep Threshold (ticks)", minval=1, maxval=20)
-levelType   = input.string("Sessions", "Level Type", options=["Sessions", "Daily"])
-showDol     = input.bool(true,  "Show DOL Levels")
-dolMinTicks = input.int(16, "Min DOL Swing (ticks)", minval=4, maxval=200)
-dolNyOnly   = input.bool(true,  "DOL only during NY session")
-showKz      = input.bool(true,  "Use Killzones")
+showFvg15 = input.bool(true, 'Show 15m FVG')
+showFvg1h = input.bool(true, 'Show 1h FVG')
+showFvg4h = input.bool(false, 'Show 4h FVG')
+fvgMinTicks = input.int(8, 'Min FVG Gap (ticks)', minval = 1, maxval = 50)
+fvgNyOnly = input.bool(true, 'FVG only during NY session')
+showIFVG = input.bool(true, 'Show iFVGs')
+showSmt = input.bool(true, 'Show SMT Divergence')
+smtSymbol = input.symbol('MES1!', 'SMT Symbol')
+showSweep = input.bool(true, 'Show Liquidity Sweeps')
+sweepTicks = input.int(2, 'Sweep Threshold (ticks)', minval = 1, maxval = 20)
+levelType = input.string('Sessions', 'Level Type', options = ['Sessions', 'Daily'])
+showDol = input.bool(true, 'Show DOL Levels')
+dolMinTicks = input.int(16, 'Min DOL Swing (ticks)', minval = 4, maxval = 200)
+dolNyOnly = input.bool(true, 'DOL only during NY session')
+showKz = input.bool(true, 'Use Killzones')
 
-cFvgBull = input.color(color.new(#00ff88, 50), "Bullish FVG")
-cFvgBear = input.color(color.new(#ff4444, 50), "Bearish FVG")
-cSmtBull = input.color(#2196F3, "Bullish SMT")
-cSmtBear = input.color(#FF9800, "Bearish SMT")
-cDol     = input.color(#9C27B0, "DOL")
-cKzNy    = color.new(#546E7A, 60)
-cKzLon   = color.new(#455A64, 65)
+cFvgBull = input.color(color.new(#00ff88, 50), 'Bullish FVG')
+cFvgBear = input.color(color.new(#ff4444, 50), 'Bearish FVG')
+cSmtBull = input.color(#2196F3, 'Bullish SMT')
+cSmtBear = input.color(#FF9800, 'Bearish SMT')
+cDol = input.color(#9C27B0, 'DOL')
+cKzNy = color.new(#546E7A, 60)
+cKzLon = color.new(#455A64, 65)
 
 // ─── Session H/L Lines (from sessionn_lines.pine) ────────────────────────────
 type SessionDisp
-    line  hiLine
-    line  loLine
-    float hi
-    float lo
-    bool  finalized
-    label hiLabel
-    label loLabel
+	line hiLine
+	line loLine
+	float hi
+	float lo
+	bool finalized
+	label hiLabel
+	label loLabel
 
 type SessionInfo
-    color  col
-    string name
-    string session
-    string tz
-    SessionDisp active = na
+	color col
+	string name
+	string session
+	string tz
+	SessionDisp active = na
 
 var array<SessionInfo> sessionInfos = array.new<SessionInfo>()
-sessionInfos.push(SessionInfo.new(color.new(#2962FF, 85), "Tokyo",  "1000-1500", "Asia/Tokyo"))
-sessionInfos.push(SessionInfo.new(color.new(#FF9800, 85), "London", "0830-1415", "Europe/London"))
-sessionInfos.push(SessionInfo.new(color.new(#089981, 85), "NY",     "0930-1600", "America/New_York"))
+sessionInfos.push(SessionInfo.new(color.new(#2962FF, 85), 'Tokyo', '1000-1500', 'Asia/Tokyo'))
+sessionInfos.push(SessionInfo.new(color.new(#FF9800, 85), 'London', '0830-1415', 'Europe/London'))
+sessionInfos.push(SessionInfo.new(color.new(#089981, 85), 'NY', '0930-1600', 'America/New_York'))
 
 int dayMs = 24 * 60 * 60 * 1000
 int extendMs = 3 * dayMs
@@ -54,11 +54,12 @@ int extendMs = 3 * dayMs
 createSession(SessionInfo this) =>
     float hi = high
     float lo = low
-    line hiLine = line.new(time, hi, time, hi, xloc=xloc.bar_time, color=this.col, width=1)
-    line loLine = line.new(time, lo, time, lo, xloc=xloc.bar_time, color=this.col, width=1)
-    label hiLb = label.new(bar_index, hi, this.name + " H", style=label.style_label_left, color=color.new(this.col, 80), textcolor=this.col, size=size.small)
-    label loLb = label.new(bar_index, lo, this.name + " L", style=label.style_label_left, color=color.new(this.col, 80), textcolor=this.col, size=size.small)
+    line hiLine = line.new(time, hi, time, hi, xloc = xloc.bar_time, color = this.col, width = 1)
+    line loLine = line.new(time, lo, time, lo, xloc = xloc.bar_time, color = this.col, width = 1)
+    label hiLb = label.new(bar_index, hi, this.name + ' H', style = label.style_label_left, color = color.new(this.col, 80), textcolor = this.col, size = size.small)
+    label loLb = label.new(bar_index, lo, this.name + ' L', style = label.style_label_left, color = color.new(this.col, 80), textcolor = this.col, size = size.small)
     this.active := SessionDisp.new(hiLine, loLine, hi, lo, false, hiLb, loLb)
+    this.active
 
 updateSession(SessionInfo this) =>
     SessionDisp d = this.active
@@ -93,17 +94,17 @@ finalizeSession(SessionInfo this) =>
         label.set_x(d.loLabel, bar_index + 1)
         label.set_y(d.loLabel, d.lo)
         d.finalized := true
+        d.finalized
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
-nySess = time(timeframe.period, "0930-1600", "America/New_York")
+nySess = time(timeframe.period, '0930-1600', 'America/New_York')
 nyKz = showKz and not na(nySess)
 nyStart = showKz and na(nySess[1]) and not na(nySess)
 bgcolor(nyKz ? cKzNy : na)
 if nyStart
-    label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
-     textcolor=color.white, size=size.small)
+    label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
 
-lonSess = time(timeframe.period, "0300-1200", "America/New_York")
+lonSess = time(timeframe.period, '0300-1200', 'America/New_York')
 lonKz = showKz and not na(lonSess)
 bgcolor(lonKz ? cKzLon : na)
 
@@ -117,44 +118,41 @@ fvgData(tf) =>
     fresh = ta.change(t) != 0
     [bull, bear, l, h2, l2, h, t, fresh]
 
-[d15b, d15r, l15, h215, l215, h15, t15, n15] = fvgData("15")
-[d1hb, d1hr, l1h, h21h, l21h, h1h, t1h, n1h] = fvgData("60")
-[d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData("240")
+[d15b, d15r, l15, h215, l215, h15, t15, n15] = fvgData('15')
+[d1hb, d1hr, l1h, h21h, l21h, h1h, t1h, n1h] = fvgData('60')
+[d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData('240')
 
 drawFvgBox(yHi, yLo, c, lbl) =>
     if math.abs(yHi - yLo) >= fvgMinTicks * syminfo.mintick
-        box.new(bar_index, yHi, bar_index + 40, yLo, border_color=c, bgcolor=color.new(c, 80))
-        label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
-         style=label.style_label_center, textcolor=color.white, size=size.tiny)
+        box.new(bar_index, yHi, bar_index + 40, yLo, border_color = c, bgcolor = color.new(c, 80))
+        label.new(bar_index, (yHi + yLo) / 2, lbl, color = color.new(c, 50), style = label.style_label_center, textcolor = color.white, size = size.tiny)
 
 nyOk = not fvgNyOnly or inNy
 if showFvg15 and nyOk and d15b[1] and n15
-    drawFvgBox(l15[1], h215[1], cFvgBull, "15M")
+    drawFvgBox(l15[1], h215[1], cFvgBull, '15M')
 if showFvg15 and nyOk and d15r[1] and n15
-    drawFvgBox(l215[1], h15[1], cFvgBear, "15M")
+    drawFvgBox(l215[1], h15[1], cFvgBear, '15M')
 if showFvg1h and nyOk and d1hb[1] and n1h
-    drawFvgBox(l1h[1], h21h[1], cFvgBull, "1H")
+    drawFvgBox(l1h[1], h21h[1], cFvgBull, '1H')
 if showFvg1h and nyOk and d1hr[1] and n1h
-    drawFvgBox(l21h[1], h1h[1], cFvgBear, "1H")
+    drawFvgBox(l21h[1], h1h[1], cFvgBear, '1H')
 if showFvg4h and nyOk and d4hb[1] and n4h
-    drawFvgBox(l4h[1], h24h[1], cFvgBull, "4H")
+    drawFvgBox(l4h[1], h24h[1], cFvgBull, '4H')
 if showFvg4h and nyOk and d4hr[1] and n4h
-    drawFvgBox(l24h[1], h4h[1], cFvgBear, "4H")
+    drawFvgBox(l24h[1], h4h[1], cFvgBear, '4H')
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
-[mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
-mHi1 = request.security(syminfo.tickerid, "1", high[1])
-mLo1 = request.security(syminfo.tickerid, "1", low[1])
+[mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, '1', [high, low, open, close])
+mHi1 = request.security(syminfo.tickerid, '1', high[1])
+mLo1 = request.security(syminfo.tickerid, '1', low[1])
 
 bIFVG = mCl < mOp and mCl < mLo1 and close > mHi1
 sIFVG = mCl > mOp and mCl > mHi1 and close < mLo1
 
 if showIFVG and bIFVG
-    label.new(bar_index, low, " IFVG", color=color.new(#00E676, 20),
-     style=label.style_label_up, textcolor=color.white, size=size.tiny)
+    label.new(bar_index, low, ' IFVG', color = color.new(#00E676, 20), style = label.style_label_up, textcolor = color.white, size = size.tiny)
 if showIFVG and sIFVG
-    label.new(bar_index, high, " IFVG", color=color.new(#FF1744, 20),
-     style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    label.new(bar_index, high, ' IFVG', color = color.new(#FF1744, 20), style = label.style_label_down, textcolor = color.white, size = size.tiny)
 
 // ─── SMT Divergence (with pivot connection lines) ────────────────────────────
 nqPl = ta.pivotlow(low, 2, 2)
@@ -176,9 +174,11 @@ sSMT = false
 if not na(esPl)
     pEsLo := esPl
     pEsLoBar := bar_index
+    pEsLoBar
 if not na(esPh)
     pEsHi := esPh
     pEsHiBar := bar_index
+    pEsHiBar
 
 if not na(nqPl)
     eLo = ta.valuewhen(not na(esPl), esPl, 0)
@@ -186,12 +186,12 @@ if not na(nqPl)
     if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
         bSMT := true
         if showSmt
-            line.new(pNqLoBar, pNqLo, bar_index, nqPl, color=cSmtBull, width=2)
-            line.new(pEsLoBar, pEsLo, eLoBar, eLo, color=cSmtBear, width=2)
-            label.new(bar_index, low, " SMT", color=cSmtBull,
-             style=label.style_label_up, textcolor=color.white, size=size.small)
+            line.new(pNqLoBar, pNqLo, bar_index, nqPl, color = cSmtBull, width = 2)
+            line.new(pEsLoBar, pEsLo, eLoBar, eLo, color = cSmtBear, width = 2)
+            label.new(bar_index, low, ' SMT', color = cSmtBull, style = label.style_label_up, textcolor = color.white, size = size.small)
     pNqLo := nqPl
     pNqLoBar := bar_index
+    pNqLoBar
 
 if not na(nqPh)
     eHi = ta.valuewhen(not na(esPh), esPh, 0)
@@ -199,52 +199,57 @@ if not na(nqPh)
     if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
         sSMT := true
         if showSmt
-            line.new(pNqHiBar, pNqHi, bar_index, nqPh, color=cSmtBear, width=2)
-            line.new(pEsHiBar, pEsHi, eHiBar, eHi, color=cSmtBull, width=2)
-            label.new(bar_index, high, " SMT", color=cSmtBear,
-             style=label.style_label_down, textcolor=color.white, size=size.small)
+            line.new(pNqHiBar, pNqHi, bar_index, nqPh, color = cSmtBear, width = 2)
+            line.new(pEsHiBar, pEsHi, eHiBar, eHi, color = cSmtBull, width = 2)
+            label.new(bar_index, high, ' SMT', color = cSmtBear, style = label.style_label_down, textcolor = color.white, size = size.small)
 
 // ─── Levels + Liquidity Sweeps ──────────────────────────────────────────────
 swp = showSweep ? sweepTicks * syminfo.mintick : na
-bool asiaHiSweep = false, asiaLoSweep = false, lonHiSweep = false, lonLoSweep = false
-dHi = request.security(syminfo.tickerid, "D", high[1])
-dLo = request.security(syminfo.tickerid, "D", low[1])
+bool asiaHiSweep = false
+asiaLoSweep = false
+lonHiSweep = false
+lonLoSweep = false
+dHi = request.security(syminfo.tickerid, 'D', high[1])
+dLo = request.security(syminfo.tickerid, 'D', low[1])
 
-if levelType == "Daily"
+if levelType == 'Daily'
     var bool dHiHit = false
     var bool dLoHit = false
     var bool dNew = false
     var line dHiLine = na
     var line dLoLine = na
-    dNew := na(dNew[1]) or timeframe.change("1D")
+    dNew := barstate.isfirst or timeframe.change('1D')
     if dNew
         dHiHit := false
         dLoHit := false
         line.delete(dHiLine)
         line.delete(dLoLine)
         if showSweep and not na(dHi)
-            dHiLine := line.new(bar_index[1], dHi, bar_index, dHi, color=color.new(#FFD600, 30), width=1, extend=extend.right)
-            dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color=color.new(#FFD600, 30), width=1, extend=extend.right)
+            dHiLine := line.new(bar_index[1], dHi, bar_index, dHi, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
+            dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
+            dLoLine
     // Sweeps: break level + close back inside
     dHiSweep = showSweep and dNew and not dHiHit and high > dHi + swp and close < dHi
     dLoSweep = showSweep and dNew and not dLoHit and low < dLo - swp and close > dLo
     if dHiSweep
-        label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30), style=label.style_label_down, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
         dHiHit := true
+        dHiHit
     if dLoSweep
-        label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30), style=label.style_label_up, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
         dLoHit := true
+        dLoHit
     // SMT alerts still use same variables
     asiaHiSweep := dHiSweep
     asiaLoSweep := dLoSweep
-    lonHiSweep  := false
-    lonLoSweep  := false
-else
-    // ─── Session H/L Lines (from sessionn_lines.pine) ─────────────────────────
+    lonHiSweep := false
+    lonLoSweep := false
+    lonLoSweep
+else // ─── Session H/L Lines (from sessionn_lines.pine) ─────────────────────────
     if timeframe.isintraday
         for info in sessionInfos
-            bool isChange = timeframe.change("1D")
-            bool inSess = not na(time("", info.session, info.tz))
+            bool isChange = timeframe.change('1D')
+            bool inSess = not na(time('', info.session, info.tz))
             if inSess
                 if na(info.active) or isChange
                     createSession(info)
@@ -254,6 +259,7 @@ else
                 if not na(info.active)
                     finalizeSession(info)
                     info.active := na
+                    info.active
 
     // Sweep detection using session levels
     if showSweep
@@ -263,14 +269,17 @@ else
             if not na(info.active)
                 if high > info.active.hi + swp and close < info.active.hi
                     sweepHi := true
+                    sweepHi
                 if low < info.active.lo - swp and close > info.active.lo
                     sweepLo := true
+                    sweepLo
         if sweepHi
-            label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30), style=label.style_label_down, textcolor=color.white, size=size.tiny)
+            label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
         if sweepLo
-            label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30), style=label.style_label_up, textcolor=color.white, size=size.tiny)
+            label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
         asiaHiSweep := sweepHi
         asiaLoSweep := sweepLo
+        asiaLoSweep
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
@@ -279,28 +288,27 @@ if showDol and (not dolNyOnly or inNy)
     dolMin = dolMinTicks * syminfo.mintick
     var float lastDolHi = na
     var float lastDolLo = na
-    var string dolLast = ""
-    if not na(dolPh) and (dolLast == "" or dolLast == "low") and (na(lastDolLo) or dolPh - lastDolLo >= dolMin)
-        label.new(bar_index, high, "DOL", color=cDol,
-         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    var string dolLast = ''
+    if not na(dolPh) and (dolLast == '' or dolLast == 'low') and (na(lastDolLo) or dolPh - lastDolLo >= dolMin)
+        label.new(bar_index, high, 'DOL', color = cDol, style = label.style_label_down, textcolor = color.white, size = size.tiny)
         lastDolHi := dolPh
-        dolLast := "high"
-    if not na(dolPl) and (dolLast == "" or dolLast == "high") and (na(lastDolHi) or lastDolHi - dolPl >= dolMin)
-        label.new(bar_index, low, "DOL", color=cDol,
-         style=label.style_label_up, textcolor=color.white, size=size.tiny)
+        dolLast := 'high'
+        dolLast
+    if not na(dolPl) and (dolLast == '' or dolLast == 'high') and (na(lastDolHi) or lastDolHi - dolPl >= dolMin)
+        label.new(bar_index, low, 'DOL', color = cDol, style = label.style_label_up, textcolor = color.white, size = size.tiny)
         lastDolLo := dolPl
-        dolLast := "low"
+        dolLast := 'low'
+        dolLast
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    lbl = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence"
-    label.new(bar_index, high, lbl, color=color.new(#1a1a2e, 30),
-     style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
+    lbl = '1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence'
+    label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
-alertcondition(bSMT, "Bullish SMT")
-alertcondition(sSMT, "Bearish SMT")
-alertcondition(bIFVG, "Bullish IFVG")
-alertcondition(sIFVG, "Bearish IFVG")
-alertcondition(asiaHiSweep or lonHiSweep, "Bearish Sweep")
-alertcondition(asiaLoSweep or lonLoSweep, "Bullish Sweep")
+alertcondition(bSMT, 'Bullish SMT')
+alertcondition(sSMT, 'Bearish SMT')
+alertcondition(bIFVG, 'Bullish IFVG')
+alertcondition(sIFVG, 'Bearish IFVG')
+alertcondition(asiaHiSweep or lonHiSweep, 'Bearish Sweep')
+alertcondition(asiaLoSweep or lonLoSweep, 'Bullish Sweep')
