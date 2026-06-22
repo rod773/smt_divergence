@@ -1,13 +1,15 @@
-Build a TradingView Pine Script indicator called "ManipulationX V.6" that replicates the indicator shown in the video "How I Get A 76% Win-Rate Trading NY Session (90% Mechanical)".
+Build a TradingView Pine Script indicator called "ManipulationX V.6" that replicates the strategy from "How I Get A 76% Win-Rate Trading NY Session (90% Mechanical)".
 
 The indicator must include:
-1. Fair Value Gaps (FVG) on 15m, 1h, and 4h timeframes — green for bullish, red for bearish, with extend option and text labels
-2. Inverse Fair Value Gaps (IFVG) on 1m — entry signals with size filter and configurable line style/width
-3. SMT Divergence between NQ (current chart) and ES (default symbol ES1!) — blue for bullish, orange for bearish, detected at swing points
-4. Draws on Liquidity — equal highs/lows (EQH/EQL) and swing DOL markers in purple
-5. Killzones — NY session (9:30-16:00 ET) and London session with background boxes
-6. Reversals (V-shape) and Continuation detection tags
-7. Strategy checklist overlay on the chart
-8. Alert conditions for SMT divergence and IFVG signals
+1. Fair Value Gaps (FVG) on 15m, 1h, 4h timeframes — green bullish, red bearish boxes with configurable min gap filter and NY-session-only toggle
+2. Inverse Fair Value Gaps (IFVG) on 1m — entry signals on the current chart
+3. SMT Divergence between MNQ (current chart) and MES (default MES1!) — pivot-based detection with visual connection lines between diverging swing points; blue bullish, orange bearish
+4. Session levels — track Asia (19:00-03:00 ET) and London (03:00-12:00 ET) highs/lows, draw horizontal rays when each session ends
+5. Liquidity sweep detection — detect when price breaks above a completed session high and closes below (bearish sweep) or breaks below session low and closes above (bullish sweep); once per level per session, configurable threshold
+6. Draw on Liquidity (DOL) — alternating high/low labels at major swing pivots with swing size filter and NY-only option
+7. Support / Resistance — horizontal thin boxes at pivot swings with size filter and NY-only option
+8. Killzones — NY (9:30-16:00 ET) and London (03:00-12:00 ET) with background color
+9. Strategy checklist overlay on last bar
+10. Alerts — SMT divergence, IFVG signals, bearish and bullish liquidity sweeps
 
-Use overlay=true, proper Pine Script v5 syntax. Avoid textfont, textalign, and font.family_monospace arguments. Use request.security for multi-timeframe data. Functions must not modify global variables.
+Use overlay=true, Pine Script v5. Avoid textfont/textalign/font.family_monospace. Use request.security for multi-timeframe data. All drawing uses box.new and line.new only (no linefill). Significance filters for FVG (min gap), S/R (min swing), DOL (min swing) with user-adjustable defaults. Sweep detection uses a once-per-level-per-session flag to prevent repeat labels.
