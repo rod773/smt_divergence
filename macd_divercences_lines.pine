@@ -1,0 +1,151 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// MACD Divergence Detection — Swing Point Method
+// Matches divergence-detector.ts logic: finds local swing highs/lows on price and MACD,
+// then compares consecutive swings to detect Regular and Hidden divergences.
+
+//@version=6
+indicator('MACD Divergences_lines', overlay = false)
+
+fast_length = input(title = 'Fast Length', defval = 12)
+slow_length = input(title = 'Slow Length', defval = 26)
+src = input(title = 'Source', defval = close)
+signal_length = input.int(title = 'Signal Smoothing', minval = 1, maxval = 50, defval = 9)
+swing_lookback = input.int(title = 'Swing Lookback', minval = 2, maxval = 20, defval = 5)
+
+[macd, macd_s, macd_h] = ta.macd(src, fast_length, slow_length, signal_length)
+
+col_macd = input(#2962FF, 'MACD Line    ', group = 'Color Settings', inline = 'MACD')
+col_signal = input(#FF6D00, 'Signal Line   ', group = 'Color Settings', inline = 'Signal')
+col_grow_above = input(#26A69A, 'Above   Grow', group = 'Histogram', inline = 'Above')
+col_fall_above = input(#B2DFDB, 'Fall', group = 'Histogram', inline = 'Above')
+col_grow_below = input(#FFCDD2, 'Below  Grow', group = 'Histogram', inline = 'Below')
+col_fall_below = input(#FF5252, 'Fall', group = 'Histogram', inline = 'Below')
+
+plot(macd, title = 'MACD', color = col_macd)
+plot(macd_s, title = 'Signal', color = col_signal)
+plot(macd_h, title = 'Histogram', style = plot.style_columns, color = macd_h >= 0 ? macd_h[1] < macd_h ? col_grow_above : col_fall_above : macd_h[1] < macd_h ? col_grow_below : col_fall_below)
+
+// --- Swing Point Detection (matches findSwingPoints in divergence-detector.ts) ---
+
+isSwingHigh(data, idx, lb) =>
+    result = true
+    for j = 1 to lb by 1
+        if data[idx] <= data[idx - j] or data[idx] <= data[idx + j]
+            result := false
+            break
+    result
+
+isSwingLow(data, idx, lb) =>
+    result = true
+    for j = 1 to lb by 1
+        if data[idx] >= data[idx - j] or data[idx] >= data[idx + j]
+            result := false
+            break
+    result
+
+// Detect swing highs/lows on current bar (only after enough lookback)
+lookback = swing_lookback
+is_price_high = bar_index >= lookback ? isSwingHigh(close, lookback, lookback) : false
+is_price_low = bar_index >= lookback ? isSwingLow(close, lookback, lookback) : false
+is_macd_high = bar_index >= lookback ? isSwingHigh(macd, lookback, lookback) : false
+is_macd_low = bar_index >= lookback ? isSwingLow(macd, lookback, lookback) : false
+
+// Track last two swing highs and lows for price and MACD
+var float prev_price_high = na
+var int prev_price_high_idx = na
+var float curr_price_high = na
+var int curr_price_high_idx = na
+
+var float prev_price_low = na
+var int prev_price_low_idx = na
+var float curr_price_low = na
+var int curr_price_low_idx = na
+
+var float prev_macd_high = na
+var int prev_macd_high_idx = na
+var float curr_macd_high = na
+var int curr_macd_high_idx = na
+
+var float prev_macd_low = na
+var int prev_macd_low_idx = na
+var float curr_macd_low = na
+var int curr_macd_low_idx = na
+
+// Update swing highs on price
+if is_price_high
+    prev_price_high := curr_price_high
+    prev_price_high_idx := curr_price_high_idx
+    curr_price_high := close
+    curr_price_high_idx := bar_index
+    curr_price_high_idx
+
+// Update swing lows on price
+if is_price_low
+    prev_price_low := curr_price_low
+    prev_price_low_idx := curr_price_low_idx
+    curr_price_low := close
+    curr_price_low_idx := bar_index
+    curr_price_low_idx
+
+// Update swing highs on MACD
+if is_macd_high
+    prev_macd_high := curr_macd_high
+    prev_macd_high_idx := curr_macd_high_idx
+    curr_macd_high := macd
+    curr_macd_high_idx := bar_index
+    curr_macd_high_idx
+
+// Update swing lows on MACD
+if is_macd_low
+    prev_macd_low := curr_macd_low
+    prev_macd_low_idx := curr_macd_low_idx
+    curr_macd_low := macd
+    curr_macd_low_idx := bar_index
+    curr_macd_low_idx
+
+// --- Divergence Detection (matches detectDivergences in divergence-detector.ts) ---
+
+// Regular Bullish: Price LL (lower low) + MACD HL (higher low)
+regular_bullish = not na(prev_price_low) and not na(curr_price_low) and not na(prev_macd_low) and not na(curr_macd_low) and curr_price_low < prev_price_low and curr_macd_low > prev_macd_low and curr_macd_low_idx > prev_macd_low_idx
+
+// Regular Bearish: Price HH (higher high) + MACD LH (lower high)
+regular_bearish = not na(prev_price_high) and not na(curr_price_high) and not na(prev_macd_high) and not na(curr_macd_high) and curr_price_high > prev_price_high and curr_macd_high < prev_macd_high and curr_macd_high_idx > prev_macd_high_idx
+
+// Hidden Bullish: Price HL (higher low) + MACD LL (lower low)
+hidden_bullish = not na(prev_price_low) and not na(curr_price_low) and not na(prev_macd_low) and not na(curr_macd_low) and curr_price_low > prev_price_low and curr_macd_low < prev_macd_low and curr_macd_low_idx > prev_macd_low_idx
+
+// Hidden Bearish: Price LH (lower high) + MACD HH (higher high)
+hidden_bearish = not na(prev_price_high) and not na(curr_price_high) and not na(prev_macd_high) and not na(curr_macd_high) and curr_price_high < prev_price_high and curr_macd_high > prev_macd_high and curr_macd_high_idx > prev_macd_high_idx
+
+// --- Draw Lines and Labels ---
+
+if regular_bullish
+    line.new(x1 = prev_macd_low_idx, y1 = prev_macd_low, x2 = curr_macd_low_idx, y2 = curr_macd_low, color = color.green, width = 2)
+    label.new(math.round((prev_macd_low_idx + curr_macd_low_idx) / 2), math.max(prev_macd_low, curr_macd_low), 'Regular Bullish', color = color.green, style = label.style_label_up, textcolor = color.white, size = size.small)
+
+if regular_bearish
+    line.new(x1 = prev_macd_high_idx, y1 = prev_macd_high, x2 = curr_macd_high_idx, y2 = curr_macd_high, color = color.red, width = 2)
+    label.new(math.round((prev_macd_high_idx + curr_macd_high_idx) / 2), math.min(prev_macd_high, curr_macd_high), 'Regular Bearish', color = color.red, style = label.style_label_down, textcolor = color.white, size = size.small)
+
+if hidden_bullish
+    line.new(x1 = prev_macd_low_idx, y1 = prev_macd_low, x2 = curr_macd_low_idx, y2 = curr_macd_low, color = color.orange, width = 2, style = line.style_dashed)
+    label.new(math.round((prev_macd_low_idx + curr_macd_low_idx) / 2), math.max(prev_macd_low, curr_macd_low), 'Hidden Bullish', color = color.orange, style = label.style_label_up, textcolor = color.white, size = size.small)
+
+if hidden_bearish
+    line.new(x1 = prev_macd_high_idx, y1 = prev_macd_high, x2 = curr_macd_high_idx, y2 = curr_macd_high, color = color.purple, width = 2, style = line.style_dashed)
+    label.new(math.round((prev_macd_high_idx + curr_macd_high_idx) / 2), math.min(prev_macd_high, curr_macd_high), 'Hidden Bearish', color = color.purple, style = label.style_label_down, textcolor = color.white, size = size.small)
+
+// --- Plotshape signals for quick visual scan ---
+
+//plotshape(regular_bullish, title="Regular Bullish", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, text="RB")
+//plotshape(regular_bearish, title="Regular Bearish", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="RB")
+//plotshape(hidden_bullish, title="Hidden Bullish", style=shape.triangleup, location=location.belowbar, color=color.orange, size=size.small, text="HB")
+//plotshape(hidden_bearish, title="Hidden Bearish", style=shape.triangledown, location=location.abovebar, color=color.purple, size=size.small, text="HB")
+
+// --- Alerts ---
+
+alertcondition(regular_bullish, title = 'Regular Bullish', message = 'Regular Bullish MACD divergence — Price LL + MACD HL')
+alertcondition(regular_bearish, title = 'Regular Bearish', message = 'Regular Bearish MACD divergence — Price HH + MACD LH')
+alertcondition(hidden_bullish, title = 'Hidden Bullish', message = 'Hidden Bullish MACD divergence — Price HL + MACD LL')
+alertcondition(hidden_bearish, title = 'Hidden Bearish', message = 'Hidden Bearish MACD divergence — Price LH + MACD HH')
+alertcondition(regular_bullish or regular_bearish or hidden_bullish or hidden_bearish, title = 'Any Divergence', message = 'MACD divergence detected')
