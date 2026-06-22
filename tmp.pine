@@ -1,0 +1,393 @@
+//@version=6
+indicator('ManipulationX V.6', overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 200)
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+showFvg15 = input.bool(true, 'Show 15m FVG')
+showFvg1h = input.bool(true, 'Show 1h FVG')
+showFvg4h = input.bool(false, 'Show 4h FVG')
+fvgMinTicks = input.int(8, 'Min FVG Gap (ticks)', minval = 1, maxval = 50)
+fvgNyOnly = input.bool(true, 'FVG only during NY session')
+showIFVG = input.bool(true, 'Show iFVGs')
+showSmt = input.bool(true, 'Show SMT Divergence')
+smtSymbol = input.symbol('BOLDUSD', 'BOLD Symbol')
+showSweep = input.bool(true, 'Show Liquidity Sweeps')
+sweepTicks = input.int(2, 'Sweep Threshold (ticks)', minval = 1, maxval = 20)
+showDol = input.bool(true, 'Show DOL Levels')
+dolMinTicks = input.int(16, 'Min DOL Swing (ticks)', minval = 4, maxval = 200)
+dolNyOnly = input.bool(true, 'DOL only during NY session')
+showKz = input.bool(true, 'Use Killzones')
+showSessions = input.bool(true, 'Show Session Boxes')
+asiaSess = input.session('0100-0900', 'Asia session')
+asiaColor = input.color(color.yellow, 'Asia color')
+sydSess = input.session('2300-0700', 'Sydney session')
+sydColor = input.color(color.rgb(255, 69, 0), 'Sydney color')
+lonSess = input.session('0900-1700', 'London session')
+lonColor = input.color(color.blue, 'London color')
+nySess = input.session('1500-2200', 'New York session')
+nyColor = input.color(color.purple, 'New York color')
+sessTransp = input.int(85, 'Session box transparency')
+sessLineStyle = input.string('solid', 'Session line style', options = ['solid', 'dashed', 'dotted'])
+sessTz = input.string('Europe/Madrid', 'Session timezone', options = ['America/New_York', 'Europe/London', 'Europe/Madrid', 'Asia/Tokyo'])
+
+cFvgBull = input.color(color.new(#00ff88, 50), 'Bullish FVG')
+cFvgBear = input.color(color.new(#ff4444, 50), 'Bearish FVG')
+cSmtBull = input.color(#2196F3, 'Bullish SMT')
+cSmtBear = input.color(#FF9800, 'Bearish SMT')
+cDol = input.color(#9C27B0, 'DOL')
+
+
+// ─── Killzones ───────────────────────────────────────────────────────────────
+var inNy = false
+bool nyKz = false
+bool lonKz = false
+
+if showKz
+    nyKzSess = time(timeframe.period, nySess, sessTz)
+    nyKz := not na(nyKzSess)
+    nyStart = na(nyKzSess[1]) and not na(nyKzSess)
+    if nyStart
+        label.new(bar_index, high, ' NY Open ', color = nyColor, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
+    
+    lonKzSess = time(timeframe.period, lonSess, sessTz)
+    lonKz := not na(lonKzSess)
+    
+    inNy := not na(nyKzSess)
+else
+    inNy := false
+    nyKz := false
+    lonKz := false
+
+
+// ─── Session Boxes (from sessions1.pine) ──────────────────────────────────────
+bool showSessBoxes = timeframe.in_seconds() < 14400
+
+sessLine = sessLineStyle == 'dashed' ? line.style_dashed : sessLineStyle == 'dotted' ? line.style_dotted : line.style_solid
+
+inSession(sess) =>
+    not na(time(timeframe.period, sess + ':1234567', sessTz))
+
+entered(cond) =>
+    cond and not cond[1]
+
+exited(cond) =>
+    not cond and cond[1]
+
+asiaIn = inSession(asiaSess)
+sydIn = inSession(sydSess)
+londonIn = inSession(lonSess)
+nySessIn = inSession(nySess)
+
+var float asiaH = na
+var float asiaL = na
+var int asiaStart = na
+var box asiaBox = na
+
+var float sydH = na
+var float sydL = na
+var int sydStart = na
+var box sydBox = na
+
+var float lonH = na
+var float lonL = na
+var int lonStart = na
+var box lonBox = na
+
+var float nyH = na
+var float nyL = na
+var int nyStart = na
+var box nyBox = na
+
+var float asiaFinalHi = na
+var float asiaFinalLo = na
+var float sydFinalHi = na
+var float sydFinalLo = na
+var float lonFinalHi = na
+var float lonFinalLo = na
+var float nyFinalHi = na
+var float nyFinalLo = na
+var float lastFinHi = na
+var float lastFinLo = na
+var bool lastFinHiHit = false
+var bool lastFinLoHit = false
+
+if showSessions and showSessBoxes
+    if entered(asiaIn)
+        asiaH := high
+        asiaL := low
+        asiaStart := bar_index
+        asiaBox := box.new(asiaStart, asiaH, bar_index, asiaL, xloc = xloc.bar_index, border_color = asiaColor, bgcolor = color.new(asiaColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
+    if not na(asiaBox)
+        if asiaIn
+            asiaH := math.max(asiaH, high)
+            asiaL := math.min(asiaL, low)
+            box.set_top(asiaBox, asiaH)
+            box.set_bottom(asiaBox, asiaL)
+            box.set_right(asiaBox, bar_index)
+        if exited(asiaIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
+            label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
+            asiaFinalHi := asiaH
+            asiaFinalLo := asiaL
+            lastFinHi := asiaH
+            lastFinLo := asiaL
+            lastFinHiHit := false
+            lastFinLoHit := false
+            asiaH := na
+            asiaL := na
+            asiaStart := na
+            asiaBox := na
+
+    if entered(sydIn)
+        sydH := high
+        sydL := low
+        sydStart := bar_index
+        sydBox := box.new(sydStart, sydH, bar_index, sydL, xloc = xloc.bar_index, border_color = sydColor, bgcolor = color.new(sydColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
+    if not na(sydBox)
+        if sydIn
+            sydH := math.max(sydH, high)
+            sydL := math.min(sydL, low)
+            box.set_top(sydBox, sydH)
+            box.set_bottom(sydBox, sydL)
+            box.set_right(sydBox, bar_index)
+        if exited(sydIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
+            label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
+            sydFinalHi := sydH
+            sydFinalLo := sydL
+            lastFinHi := sydH
+            lastFinLo := sydL
+            lastFinHiHit := false
+            lastFinLoHit := false
+            sydH := na
+            sydL := na
+            sydStart := na
+            sydBox := na
+
+    if entered(londonIn)
+        lonH := high
+        lonL := low
+        lonStart := bar_index
+        lonBox := box.new(lonStart, lonH, bar_index, lonL, xloc = xloc.bar_index, border_color = lonColor, bgcolor = color.new(lonColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
+    if not na(lonBox)
+        if londonIn
+            lonH := math.max(lonH, high)
+            lonL := math.min(lonL, low)
+            box.set_top(lonBox, lonH)
+            box.set_bottom(lonBox, lonL)
+            box.set_right(lonBox, bar_index)
+        if exited(londonIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
+            label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
+            lonFinalHi := lonH
+            lonFinalLo := lonL
+            lastFinHi := lonH
+            lastFinLo := lonL
+            lastFinHiHit := false
+            lastFinLoHit := false
+            lonH := na
+            lonL := na
+            lonStart := na
+            lonBox := na
+
+    if entered(nySessIn)
+        nyH := high
+        nyL := low
+        nyStart := bar_index
+        nyBox := box.new(nyStart, nyH, bar_index, nyL, xloc = xloc.bar_index, border_color = nyColor, bgcolor = color.new(nyColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
+    if not na(nyBox)
+        if nySessIn
+            nyH := math.max(nyH, high)
+            nyL := math.min(nyL, low)
+            box.set_top(nyBox, nyH)
+            box.set_bottom(nyBox, nyL)
+            box.set_right(nyBox, bar_index)
+        if exited(nySessIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
+            label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
+            nyFinalHi := nyH
+            nyFinalLo := nyL
+            lastFinHi := nyH
+            lastFinLo := nyL
+            lastFinHiHit := false
+            lastFinLoHit := false
+            nyH := na
+            nyL := na
+            nyStart := na
+            nyBox := na
+
+// ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
+fvgDraw(tf, cBull, cBear, lbl) =>
+    [h, l, h2, l2, t] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2], time])
+    bull = l > h2
+    bear = h < l2
+    fresh = ta.change(t) != 0
+    nyOk = not fvgNyOnly or inNy
+    if nyOk and bull[1] and fresh and math.abs(l[1] - h2[1]) >= fvgMinTicks * syminfo.mintick
+        box.new(bar_index, l[1], bar_index + 40, h2[1], border_color = cBull, bgcolor = color.new(cBull, 80))
+        label.new(bar_index, (l[1] + h2[1]) / 2, lbl, color = color.new(cBull, 50), style = label.style_label_center, textcolor = color.white, size = size.tiny)
+    if nyOk and bear[1] and fresh and math.abs(l2[1] - h[1]) >= fvgMinTicks * syminfo.mintick
+        box.new(bar_index, l2[1], bar_index + 40, h[1], border_color = cBear, bgcolor = color.new(cBear, 80))
+        label.new(bar_index, (l2[1] + h[1]) / 2, lbl, color = color.new(cBear, 50), style = label.style_label_center, textcolor = color.white, size = size.tiny)
+
+if showFvg15
+    fvgDraw('15', cFvgBull, cFvgBear, '15M')
+if showFvg1h
+    fvgDraw('60', cFvgBull, cFvgBear, '1H')
+if showFvg4h
+    fvgDraw('240', cFvgBull, cFvgBear, '4H')
+
+// ─── IFVG (1m) ───────────────────────────────────────────────────────────────
+var bIFVG = false
+var sIFVG = false
+
+if showIFVG
+    [_, _, mOp, mCl, mHi1, mLo1] = request.security(syminfo.tickerid, '1', [high, low, open, close, high[1], low[1]])
+    bIFVG := mCl < mOp and mCl < mLo1 and close > mHi1
+    sIFVG := mCl > mOp and mCl > mHi1 and close < mLo1
+    if bIFVG
+        label.new(bar_index, low, ' IFVG', color = color.new(#00E676, 20), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+    if sIFVG
+        label.new(bar_index, high, ' IFVG', color = color.new(#FF1744, 20), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+else
+    bIFVG := false
+    sIFVG := false
+
+// ─── SMT Divergence AUDUSD vs BOLD (AUDUSD-side lines only) ─────────────────
+var float pAudLo = na
+var int pAudLoBar = na
+var float pAudHi = na
+var int pAudHiBar = na
+var float pBoldLo = na
+var int pBoldLoBar = na
+var float pBoldHi = na
+var int pBoldHiBar = na
+var bSMT = false
+var sSMT = false
+
+audPl = ta.pivotlow(low, 2, 2)
+audPh = ta.pivothigh(high, 2, 2)
+boldPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
+boldPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
+
+if showSmt
+    bSMT := false
+    sSMT := false
+    
+    bLo = ta.valuewhen(not na(boldPl), boldPl, 0)
+    bLoBar = ta.valuewhen(not na(boldPl), bar_index, 0)
+    bHi = ta.valuewhen(not na(boldPh), boldPh, 0)
+    bHiBar = ta.valuewhen(not na(boldPh), bar_index, 0)
+    
+    if not na(audPl)
+        if not na(pAudLo) and not na(bLo) and audPl > pAudLo and bLo < pBoldLo
+            bSMT := true
+            line.new(pAudLoBar, pAudLo, bar_index, audPl, color = cSmtBull, width = 2)
+            label.new(bar_index, low, ' SMT', color = cSmtBull, style = label.style_label_up, textcolor = color.white, size = size.small)
+        pAudLo := audPl
+        pAudLoBar := bar_index
+        pBoldLo := bLo
+        pBoldLoBar := bLoBar
+    
+    if not na(audPh)
+        if not na(pAudHi) and not na(bHi) and audPh < pAudHi and bHi > pBoldHi
+            sSMT := true
+            line.new(pAudHiBar, pAudHi, bar_index, audPh, color = cSmtBear, width = 2)
+            label.new(bar_index, high, ' SMT', color = cSmtBear, style = label.style_label_down, textcolor = color.white, size = size.small)
+        pAudHi := audPh
+        pAudHiBar := bar_index
+        pBoldHi := bHi
+        pBoldHiBar := bHiBar
+else
+    bSMT := false
+    sSMT := false
+
+// ─── Levels + Liquidity Sweeps ──────────────────────────────────────────────
+swp = showSweep ? sweepTicks * syminfo.mintick : na
+bool asiaHiSweep = false
+asiaLoSweep = false
+lonHiSweep = false
+lonLoSweep = false
+[dHi, dLo] = request.security(syminfo.tickerid, 'D', [high[1], low[1]])
+var bool dHiHit = false
+var bool dLoHit = false
+var bool dNew = false
+var line dHiLine = na
+var line dLoLine = na
+dNew := barstate.isfirst or timeframe.change('1D')
+if dNew
+    dHiHit := false
+    dLoHit := false
+    line.delete(dHiLine)
+    line.delete(dLoLine)
+    if showSweep and not na(dHi)
+        dHiLine := line.new(bar_index[1], dHi, bar_index, dHi, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
+        dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
+
+// Sweeps: break level + close back inside
+barHiSweep = false
+barLoSweep = false
+dHiSweep = showSweep and dNew and not dHiHit and high > dHi + swp and close < dHi
+dLoSweep = showSweep and dNew and not dLoHit and low < dLo - swp and close > dLo
+if dHiSweep
+    barHiSweep := true
+    dHiHit := true
+if dLoSweep
+    barLoSweep := true
+    dLoHit := true
+
+float sweepHiPrice = na
+float sweepLoPrice = na
+
+// Session level sweeps: only the most recently completed session's final levels
+if showSweep
+    if not lastFinHiHit and not na(lastFinHi) and high > lastFinHi + swp and close < lastFinHi
+        lastFinHiHit := true
+        sweepHiPrice := lastFinHi
+    if not lastFinLoHit and not na(lastFinLo) and low < lastFinLo - swp and close > lastFinLo
+        lastFinLoHit := true
+        sweepLoPrice := lastFinLo
+
+// Draw at most one label per direction, at the actual swept level price
+if not na(sweepHiPrice)
+    label.new(bar_index, sweepHiPrice, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+if not na(sweepLoPrice)
+    label.new(bar_index, sweepLoPrice, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+asiaHiSweep := barHiSweep or not na(sweepHiPrice)
+asiaLoSweep := barLoSweep or not na(sweepLoPrice)
+
+// ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
+dolPh = ta.pivothigh(high, 4, 4)
+dolPl = ta.pivotlow(low, 4, 4)
+if showDol and (not dolNyOnly or inNy)
+    dolMin = dolMinTicks * syminfo.mintick
+    var float lastDolHi = na
+    var float lastDolLo = na
+    var string dolLast = ''
+    if not na(dolPh) and (dolLast == '' or dolLast == 'low') and (na(lastDolLo) or dolPh - lastDolLo >= dolMin)
+        label.new(bar_index, high, 'DOL', color = cDol, style = label.style_label_down, textcolor = color.white, size = size.tiny)
+        lastDolHi := dolPh
+        dolLast := 'high'
+        dolLast
+    if not na(dolPl) and (dolLast == '' or dolLast == 'high') and (na(lastDolHi) or lastDolHi - dolPl >= dolMin)
+        label.new(bar_index, low, 'DOL', color = cDol, style = label.style_label_up, textcolor = color.white, size = size.tiny)
+        lastDolLo := dolPl
+        dolLast := 'low'
+        dolLast
+
+// ─── Checklist ───────────────────────────────────────────────────────────────
+${{var label checklistLbl = na}}`r`nif barstate.islast and na(checklistLbl)
+    lbl = '1. NY session (15:00 Madrid)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
+    label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
+
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+alertcondition(bSMT, 'Bullish SMT')
+alertcondition(sSMT, 'Bearish SMT')
+alertcondition(bIFVG, 'Bullish IFVG')
+alertcondition(sIFVG, 'Bearish IFVG')
+alertcondition(asiaHiSweep or lonHiSweep, 'Bearish Sweep')
+alertcondition(asiaLoSweep or lonLoSweep, 'Bullish Sweep')
+

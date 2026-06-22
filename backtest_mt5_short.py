@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 # ═══════════════════════════════════════════════════════════════════
 SYMBOL        = "AUDUSD"
 TIMEFRAMES    = ["M1", "M15", "H1"]        # Base, FVG, trend
-BACKTEST_DAYS = 60                          # Days of history to fetch
+BACKTEST_DAYS = 5                          # Days of history to fetch
 USE_TICKS     = False                        # True=tick-level (slow), False=M1 bars (fast)
 
 # Strategy params (matching MQ5 EA)
