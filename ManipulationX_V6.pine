@@ -142,9 +142,7 @@ if showFvg4h and nyOk and d4hr[1] and n4h
     drawFvgBox(l24h[1], h4h[1], cFvgBear, '4H')
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
-[mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, '1', [high, low, open, close])
-mHi1 = request.security(syminfo.tickerid, '1', high[1])
-mLo1 = request.security(syminfo.tickerid, '1', low[1])
+[mHi, mLo, mOp, mCl, mHi1, mLo1] = request.security(syminfo.tickerid, '1', [high, low, open, close, high[1], low[1]])
 
 bIFVG = mCl < mOp and mCl < mLo1 and close > mHi1
 sIFVG = mCl > mOp and mCl > mHi1 and close < mLo1
@@ -209,8 +207,7 @@ bool asiaHiSweep = false
 asiaLoSweep = false
 lonHiSweep = false
 lonLoSweep = false
-dHi = request.security(syminfo.tickerid, 'D', high[1])
-dLo = request.security(syminfo.tickerid, 'D', low[1])
+[dHi, dLo] = request.security(syminfo.tickerid, 'D', [high[1], low[1]])
 
 if levelType == 'Daily'
     var bool dHiHit = false
@@ -247,8 +244,8 @@ if levelType == 'Daily'
     lonLoSweep
 else // ─── Session H/L Lines (from sessionn_lines.pine) ─────────────────────────
     if timeframe.isintraday
+        bool isChange = timeframe.change('1D')
         for info in sessionInfos
-            bool isChange = timeframe.change('1D')
             bool inSess = not na(time('', info.session, info.tz))
             if inSess
                 if na(info.active) or isChange
