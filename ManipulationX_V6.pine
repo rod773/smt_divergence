@@ -1,220 +1,161 @@
 //@version=5
-indicator("ManipulationX V.6", overlay=true, max_bars_back=500, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+indicator("ManipulationX V.6", overlay=true, max_lines_count=300, max_labels_count=300, max_boxes_count=300)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  SETTINGS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ─── IFVG ────────────────────────────────────────────────────────────────────
-showIFVG       = input.bool(true,  "Show iFVGs")
-ifvgStyle      = input.string("Solid", "IFVG Line Style", options=["Solid", "Dashed", "Dotted"])
-ifvgWidth      = input.int(2, "IFVG Line Width", minval=1, maxval=5)
-ifvgMinSize    = input.float(0.0, "Minimum Size", step=0.25)
-ifvgSizeFilter = input.bool(true, "Size Filter")
-
-// ─── HTF FVG ─────────────────────────────────────────────────────────────────
+// ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15      = input.bool(true,  "Show 15m FVG")
 showFvg1h      = input.bool(true,  "Show 1h FVG")
 showFvg4h      = input.bool(false, "Show 4h FVG")
-fvgMethod      = input.string("100%", "Mitigation Method", options=["50%", "100%", "Full Wick"])
-fvgInternal    = input.bool(true,  "Show Internal")
-fvgShowText    = input.bool(true,  "Show Text")
-fvgExtendTF    = input.bool(true,  "Extend FVG")
-fvgMaxCount    = input.int(50, "Max FVGs", minval=5, maxval=200)
-
-// ─── Liquidity ───────────────────────────────────────────────────────────────
-showLiq        = input.bool(true,  "Show Draws on Liquidity")
-liqLook        = input.int(50, "Liquidity Lookback", minval=10, maxval=300)
-
-// ─── SMT ─────────────────────────────────────────────────────────────────────
+showIFVG       = input.bool(true,  "Show iFVGs")
 showSmt        = input.bool(true,  "Show SMT Divergence")
-smtSymbol      = input.symbol("ES1!", "SMT Comparison Symbol")
+smtSymbol      = input.symbol("ES1!", "SMT Symbol")
+showDol        = input.bool(true,  "Show DOL Levels")
+showSr         = input.bool(true,  "Show S/R Levels")
+srLookback     = input.int(20, "S/R Lookback", minval=5, maxval=100)
+showKz         = input.bool(true, "Use Killzones")
+showReversals  = input.bool(false, "Show Reversals")
+
+cFvgBull   = input.color(color.new(#00ff88, 70), "Bullish FVG")
+cFvgBear   = input.color(color.new(#ff4444, 70), "Bearish FVG")
+cSmtBull   = input.color(#2196F3, "Bullish SMT")
+cSmtBear   = input.color(#FF9800, "Bearish SMT")
+cDol       = input.color(#9C27B0, "DOL")
+cSr        = input.color(color.new(#FFD600, 40), "S/R Lines")
+cKzNy      = color.new(#546E7A, 60)
+cKzLon     = color.new(#455A64, 65)
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
-showKz         = input.bool(true, "Use Killzones")
-showNyKz       = input.bool(true, "New York KZ (09:30-16:00 ET)")
-showLonKz      = input.bool(false, "London KZ (03:00-12:00 ET)")
-
-// ─── Reversals / Continuations ───────────────────────────────────────────────
-showReversals  = input.bool(true, "Show Reversals")
-showContinuations = input.bool(false, "Show Continuations")
-
-// ─── Colors ──────────────────────────────────────────────────────────────────
-cFvgBull       = input.color(color.new(#00ff88, 72), "Bullish FVG")
-cFvgBear       = input.color(color.new(#ff4444, 72), "Bearish FVG")
-cIfvgBull      = input.color(color.new(#00E676, 20), "Bullish IFVG")
-cIfvgBear      = input.color(color.new(#FF1744, 20), "Bearish IFVG")
-cSmtBull       = input.color(#2196F3, "Bullish SMT")
-cSmtBear       = input.color(#FF9800, "Bearish SMT")
-cLiq           = input.color(#9C27B0, "Liquidity Label")
-cKzNy          = input.color(color.new(#546E7A, 60), "NY Killzone")
-cKzLon         = input.color(color.new(#455A64, 65), "London Killzone")
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  KILLZONE
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// NY Killzone: 09:30-16:00 ET
-nySession = time(timeframe.period, "0930-1600", "America/New_York")
-nyKz = showKz and showNyKz and not na(nySession)
-nyOpenBar = showKz and showNyKz and na(nySession[1]) and not na(nySession)
-bgcolor(nyKz ? cKzNy : na, title="NY Killzone")
-if nyOpenBar
+nySess = time(timeframe.period, "0930-1600", "America/New_York")
+nyKz = showKz and not na(nySess)
+nyStart = showKz and na(nySess[1]) and not na(nySess)
+bgcolor(nyKz ? cKzNy : na)
+if nyStart
     label.new(bar_index, high, " NY Open ", color=cKzNy, style=label.style_label_lower_left,
      textcolor=color.white, size=size.small)
 
-// London Killzone: 03:00-12:00 ET
-lonSession = time(timeframe.period, "0300-1200", "America/New_York")
-lonKz = showKz and showLonKz and not na(lonSession)
-lonOpenBar = showKz and showLonKz and na(lonSession[1]) and not na(lonSession)
-bgcolor(lonKz ? cKzLon : na, title="London Killzone")
-if lonOpenBar
-    label.new(bar_index, high, " London ", color=cKzLon, style=label.style_label_lower_left,
-     textcolor=color.white, size=size.small)
+lonSess = time(timeframe.period, "0300-1200", "America/New_York")
+lonKz = showKz and not na(lonSess)
+bgcolor(lonKz ? cKzLon : na)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  FVG DETECTION
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── FVG Detection (3-bar gap, draws once per HTF bar) ──────────────────────
+fvgData(tf) =>
+    [h, l, h2, l2] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2]])
+    [l > h2, h < l2, l, h2, l2, h]
 
-// 3-bar FVG detection on higher timeframe
-fvgDetect(tf) =>
-    [hi, lo, hi2, lo2] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2]])
-    bullOk = lo > hi2
-    bearOk = hi < lo2
-    [bullOk ? lo : na, bullOk ? hi2 : na, bearOk ? lo2 : na, bearOk ? hi : na]
+[ok15b, ok15r, l15, h215, l215, h15] = fvgData("15")
+[ok1hb, ok1hr, l1h, h21h, l21h, h1h] = fvgData("60")
+[ok4hb, ok4hr, l4h, h24h, l24h, h4h] = fvgData("240")
 
-[f15bT, f15bB, f15rT, f15rB] = fvgDetect("15")
-[f1hbT, f1hbB, f1hrT, f1hrB] = fvgDetect("60")
-[f4hbT, f4hbB, f4hrT, f4hrB] = fvgDetect("240")
+// Only draw on the first bar of each HTF period to avoid repeats
+fvgNew(tf, hi) =>
+    [chg] = request.security(syminfo.tickerid, tf, [ta.change(high)])
+    chg != 0
+
+n15 = fvgNew("15", high)
+n1h = fvgNew("60", high)
+n4h = fvgNew("240", high)
+
+drawFvg(bull, ok, top, bot, nw, lbl) =>
+    if ok and nw
+        c = bull ? cFvgBull : cFvgBear
+        box.new(bar_index-1, top, bar_index, bot, border_color=c, bgcolor=c)
+        line.new(bar_index-1, top, bar_index, top, color=c, extend=extend.right)
+        line.new(bar_index-1, bot, bar_index, bot, color=c, extend=extend.right)
+        label.new(bar_index, (top+bot)/2, lbl, color=c, style=label.style_label_center,
+         textcolor=color.white, size=size.tiny)
+
+if showFvg15
+    drawFvg(true,  ok15b, l15,  h215, n15, "15M")
+    drawFvg(false, ok15r, l215, h15,  n15, "15M")
+if showFvg1h
+    drawFvg(true,  ok1hb, l1h,  h21h, n1h, "1H")
+    drawFvg(false, ok1hr, l21h, h1h,  n1h, "1H")
+if showFvg4h
+    drawFvg(true,  ok4hb, l4h,  h24h, n4h, "4H")
+    drawFvg(false, ok4hr, l24h, h4h,  n4h, "4H")
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
-[m1hi, m1lo, m1op, m1cl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
-m1hi1 = request.security(syminfo.tickerid, "1", high[1])
-m1lo1 = request.security(syminfo.tickerid, "1", low[1])
+[mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
+mHi1 = request.security(syminfo.tickerid, "1", high[1])
+mLo1 = request.security(syminfo.tickerid, "1", low[1])
 
-// Bullish IFVG: bearish 1m closes below prior low, then price breaks above its high
-ifvgBody = math.abs(m1cl - m1op)
-bullIFVG = m1cl < m1op and m1cl < m1lo1 and close > m1hi1 and ifvgBody >= ifvgMinSize
-bearIFVG = m1cl > m1op and m1cl > m1hi1 and close < m1lo1 and ifvgBody >= ifvgMinSize
+bIFVG = mCl < mOp and mCl < mLo1 and close > mHi1
+sIFVG = mCl > mOp and mCl > mHi1 and close < mLo1
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  SMT DIVERGENCE
-// ═══════════════════════════════════════════════════════════════════════════════
+if showIFVG and bIFVG
+    label.new(bar_index, low, " IFVG", color=color.new(#00E676, 20),
+     style=label.style_label_up, textcolor=color.white, size=size.tiny)
+if showIFVG and sIFVG
+    label.new(bar_index, high, " IFVG", color=color.new(#FF1744, 20),
+     style=label.style_label_down, textcolor=color.white, size=size.tiny)
 
-// Pivot detection (2 left + 2 right bars)
+// ─── SMT Divergence ──────────────────────────────────────────────────────────
 nqPl = ta.pivotlow(low, 2, 2)
 nqPh = ta.pivothigh(high, 2, 2)
 esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
 esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
 
-var float lastNqLo = na
-var float lastEsLo = na
-var float lastNqHi = na
-var float lastEsHi = na
+var float pNqLo = na; var float pEsLo = na
+var float pNqHi = na; var float pEsHi = na
 
-bullSMT = false
-bearSMT = false
+bSMT = false; sSMT = false
 
 if not na(nqPl)
-    esPv = ta.valuewhen(not na(esPl), esPl, 0)
-    if not na(lastNqLo) and not na(esPv) and nqPl > lastNqLo and esPv < lastEsLo
-        bullSMT := true
-    lastNqLo := nqPl
-    if not na(esPv)
-        lastEsLo := esPv
+    eLo = ta.valuewhen(not na(esPl), esPl, 0)
+    if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
+        bSMT := true
+    pNqLo := nqPl
+    if not na(eLo); pEsLo := eLo
 
 if not na(nqPh)
-    esPv = ta.valuewhen(not na(esPh), esPh, 0)
-    if not na(lastNqHi) and not na(esPv) and nqPh < lastNqHi and esPv > lastEsHi
-        bearSMT := true
-    lastNqHi := nqPh
-    if not na(esPv)
-        lastEsHi := esPv
+    eHi = ta.valuewhen(not na(esPh), esPh, 0)
+    if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
+        sSMT := true
+    pNqHi := nqPh
+    if not na(eHi); pEsHi := eHi
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  LIQUIDITY LEVELS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-if showLiq
-    if not na(nqPh)
-        label.new(bar_index, high, "DOL", color=cLiq,
-         style=label.style_label_down, textcolor=color.white, size=size.tiny)
-    if not na(nqPl)
-        label.new(bar_index, low, "DOL", color=cLiq,
-         style=label.style_label_up, textcolor=color.white, size=size.tiny)
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  FVG BOX DRAWING
-// ═══════════════════════════════════════════════════════════════════════════════
-
-drawFvgBox(top, bot, bull, txt) =>
-    if not na(top) and not na(bot)
-        c = bull ? cFvgBull : cFvgBear
-        yTop = math.max(top, bot)
-        yBot = math.min(top, bot)
-        box.new(bar_index-1, yTop, bar_index, yBot, border_color=c, bgcolor=c)
-        if fvgExtendTF
-            line.new(bar_index-1, yTop, bar_index, yTop, color=c, width=1, extend=extend.right)
-            line.new(bar_index-1, yBot, bar_index, yBot, color=c, width=1, extend=extend.right)
-        if fvgShowText
-            label.new(bar_index, (yTop + yBot) / 2, txt, color=c,
-             style=label.style_label_center, textcolor=color.white, size=size.tiny)
-
-if showFvg15
-    drawFvgBox(f15bT, f15bB, true, "15M FVG")
-    drawFvgBox(f15rT, f15rB, false, "15M FVG")
-if showFvg1h
-    drawFvgBox(f1hbT, f1hbB, true, "1H FVG")
-    drawFvgBox(f1hrT, f1hrB, false, "1H FVG")
-if showFvg4h
-    drawFvgBox(f4hbT, f4hbB, true, "4H FVG")
-    drawFvgBox(f4hrT, f4hrB, false, "4H FVG")
-
-// ─── IFVG Labels ─────────────────────────────────────────────────────────────
-if showIFVG and bullIFVG
-    label.new(bar_index, low, " IFVG", color=cIfvgBull,
-     style=label.style_label_up, textcolor=color.white, size=size.tiny)
-if showIFVG and bearIFVG
-    label.new(bar_index, high, " IFVG", color=cIfvgBear,
-     style=label.style_label_down, textcolor=color.white, size=size.tiny)
-
-// ─── SMT Labels ──────────────────────────────────────────────────────────────
-if showSmt and bullSMT
+if showSmt and bSMT
     label.new(bar_index, low, " SMT ▲", color=cSmtBull,
      style=label.style_label_up, textcolor=color.white, size=size.small)
-if showSmt and bearSMT
+if showSmt and sSMT
     label.new(bar_index, high, " SMT ▼", color=cSmtBear,
      style=label.style_label_down, textcolor=color.white, size=size.small)
 
-// ─── Reversal / Continuation Tags ────────────────────────────────────────────
-if showReversals
-    // V-shape reversal detection: sharp move down then immediate close above
-    vShapeRev = close > open and low < low[1] and close > low[1] + (high[1] - low[1]) * 0.5
-    if vShapeRev and bullIFVG
-        label.new(bar_index, low, " REV ▲", color=color.new(#FFD600, 30),
+// ─── DOL Levels (at pivot points) ────────────────────────────────────────────
+if showDol
+    if not na(nqPh)
+        label.new(bar_index, high, "DOL", color=cDol,
+         style=label.style_label_down, textcolor=color.white, size=size.tiny)
+    if not na(nqPl)
+        label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
-if showContinuations
-    contBull = close > open and close > high[1]
-    contBear = close < open and close < low[1]
-    if contBull
-        label.new(bar_index, low, " CONT ▲", color=color.new(#00BFA5, 30),
+// ─── S/R Levels (horizontal lines at recent swings) ─────────────────────────
+if showSr
+    srHi = ta.pivothigh(high, 3, 3)
+    srLo = ta.pivotlow(low, 3, 3)
+    var int srIdx = 0
+    if not na(srHi)
+        line.new(bar_index, srHi, bar_index+srLookback, srHi, color=cSr, width=1, extend=extend.right)
+        srIdx += 1
+    if not na(srLo)
+        line.new(bar_index, srLo, bar_index+srLookback, srLo, color=cSr, width=1, extend=extend.right)
+        srIdx += 1
+
+// ─── Reversals ───────────────────────────────────────────────────────────────
+if showReversals
+    rev = close > open and low < low[1] and close > high[1]
+    if rev and bIFVG
+        label.new(bar_index, low, " REV", color=color.new(#FFD600, 30),
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
-    if contBear
-        label.new(bar_index, high, " CONT ▼", color=color.new(#D50000, 30),
-         style=label.style_label_down, textcolor=color.white, size=size.tiny)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    chk = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence"
-    label.new(bar_index, high, chk, color=color.new(#1a1a2e, 30),
+    lbl = "1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence"
+    label.new(bar_index, high, lbl, color=color.new(#1a1a2e, 30),
      style=label.style_label_lower_left, textcolor=color.white, size=size.normal)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  ALERTS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-alertcondition(bullSMT,  "Bullish SMT", "{{ticker}}: Bullish SMT divergence at {{close}}")
-alertcondition(bearSMT,  "Bearish SMT", "{{ticker}}: Bearish SMT divergence at {{close}}")
-alertcondition(bullIFVG, "Bullish IFVG", "{{ticker}}: Bullish IFVG entry signal at {{close}}")
-alertcondition(bearIFVG, "Bearish IFVG", "{{ticker}}: Bearish IFVG entry signal at {{close}}")
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+alertcondition(bSMT, "Bullish SMT")
+alertcondition(sSMT, "Bearish SMT")
+alertcondition(bIFVG, "Bullish IFVG")
+alertcondition(sIFVG, "Bearish IFVG")
