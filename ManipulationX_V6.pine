@@ -257,7 +257,8 @@ else
 
     // Sweep detection using session levels
     if showSweep
-        sweepHi = false; sweepLo = false
+        sweepHi = false
+        sweepLo = false
         for info in sessionInfos
             if not na(info.active)
                 if high > info.active.hi + swp and close < info.active.hi
