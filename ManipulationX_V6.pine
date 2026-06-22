@@ -34,8 +34,7 @@ cFvgBear = input.color(color.new(#ff4444, 50), 'Bearish FVG')
 cSmtBull = input.color(#2196F3, 'Bullish SMT')
 cSmtBear = input.color(#FF9800, 'Bearish SMT')
 cDol = input.color(#9C27B0, 'DOL')
-cKzNy = color.new(#546E7A, 60)
-cKzLon = color.new(#455A64, 65)
+
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
 var inNy = false
@@ -58,8 +57,6 @@ else
     nyKz := false
     lonKz := false
 
-bgcolor(nyKz ? cKzNy : na)
-bgcolor(lonKz ? cKzLon : na)
 
 // ─── Session Boxes (from sessions1.pine) ──────────────────────────────────────
 bool showSessBoxes = timeframe.in_seconds() < 14400
