@@ -65,16 +65,6 @@ updateSession(SessionInfo this) =>
     SessionDisp d = this.active
     d.hi := math.max(d.hi, high)
     d.lo := math.min(d.lo, low)
-    line.set_x2(d.hiLine, time)
-    line.set_y2(d.hiLine, d.hi)
-    line.set_y1(d.hiLine, d.hi)
-    line.set_x2(d.loLine, time)
-    line.set_y2(d.loLine, d.lo)
-    line.set_y1(d.loLine, d.lo)
-    label.set_x(d.hiLabel, bar_index + 1)
-    label.set_y(d.hiLabel, d.hi)
-    label.set_x(d.loLabel, bar_index + 1)
-    label.set_y(d.loLabel, d.lo)
 
 finalizeSession(SessionInfo this) =>
     SessionDisp d = this.active
@@ -97,18 +87,23 @@ finalizeSession(SessionInfo this) =>
         d.finalized
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
-nySess = time(timeframe.period, '0930-1600', 'America/New_York')
-nyKz = showKz and not na(nySess)
-nyStart = showKz and na(nySess[1]) and not na(nySess)
-bgcolor(nyKz ? cKzNy : na)
-if nyStart
-    label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
+var inNy = false
 
-lonSess = time(timeframe.period, '0300-1200', 'America/New_York')
-lonKz = showKz and not na(lonSess)
-bgcolor(lonKz ? cKzLon : na)
-
-inNy = not na(nySess)
+if showKz
+    nySess = time(timeframe.period, '0930-1600', 'America/New_York')
+    nyKz = not na(nySess)
+    nyStart = na(nySess[1]) and not na(nySess)
+    bgcolor(nyKz ? cKzNy : na)
+    if nyStart
+        label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
+    
+    lonSess = time(timeframe.period, '0300-1200', 'America/New_York')
+    lonKz = not na(lonSess)
+    bgcolor(lonKz ? cKzLon : na)
+    
+    inNy := not na(nySess)
+else
+    inNy := false
 
 // ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
 fvgDraw(tf, cBull, cBear, lbl) =>
