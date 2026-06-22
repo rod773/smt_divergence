@@ -379,9 +379,10 @@ if showDol and (not dolNyOnly or inNy)
         dolLast
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
-if barstate.islast
+var label checklistLbl = na
+if barstate.islast and na(checklistLbl)
     lbl = '1. NY session (15:00 Madrid)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
-    label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
+    checklistLbl := label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
 alertcondition(bSMT, 'Bullish SMT')
