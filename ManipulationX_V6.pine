@@ -84,23 +84,28 @@ nqPh = ta.pivothigh(high, 2, 2)
 esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
 esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
 
-var float pNqLo = na; var float pEsLo = na
-var float pNqHi = na; var float pEsHi = na
-bSMT = false; sSMT = false
+var float pNqLo = na
+var float pEsLo = na
+var float pNqHi = na
+var float pEsHi = na
+bSMT = false
+sSMT = false
 
 if not na(nqPl)
     eLo = ta.valuewhen(not na(esPl), esPl, 0)
     if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
         bSMT := true
     pNqLo := nqPl
-    if not na(eLo); pEsLo := eLo
+    if not na(eLo)
+        pEsLo := eLo
 
 if not na(nqPh)
     eHi = ta.valuewhen(not na(esPh), esPh, 0)
     if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
         sSMT := true
     pNqHi := nqPh
-    if not na(eHi); pEsHi := eHi
+    if not na(eHi)
+        pEsHi := eHi
 
 if showSmt and bSMT
     label.new(bar_index, low, " SMT", color=cSmtBull,
@@ -131,8 +136,10 @@ drawSrLine(px) =>
 if showSr
     srHi = ta.pivothigh(high, 3, 3)
     srLo = ta.pivotlow(low, 3, 3)
-    if not na(srHi); drawSrLine(srHi)
-    if not na(srLo); drawSrLine(srLo)
+    if not na(srHi)
+        drawSrLine(srHi)
+    if not na(srLo)
+        drawSrLine(srLo)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
