@@ -26,32 +26,73 @@ cDol     = input.color(#9C27B0, "DOL")
 cKzNy    = color.new(#546E7A, 60)
 cKzLon   = color.new(#455A64, 65)
 
-// ─── Session types & helpers ─────────────────────────────────────────────────
-type SessionState
+// ─── Session H/L Lines (from sessionn_lines.pine) ────────────────────────────
+type SessionDisp
+    line  hiLine
+    line  loLine
+    float hi
+    float lo
+    bool  finalized
+    label hiLabel
+    label loLabel
+
+type SessionInfo
+    color  col
     string name
     string session
     string tz
-    color  col
-    float  hi
-    float  lo
-    bool   active
+    SessionDisp active = na
 
-sessionUpdate(SessionState s) =>
-    bool newDay  = timeframe.change("1D")
-    bool inSess  = not na(time("", s.session, s.tz))
-    if inSess
-        if newDay or not s.active
-            s.hi := high
-            s.lo := low
-            s.active := true
-        else
-            s.hi := math.max(s.hi, high)
-            s.lo := math.min(s.lo, low)
-        s
-    else
-        if s.active
-            s.active := false
-        s
+var array<SessionInfo> sessionInfos = array.from(
+    SessionInfo.new(color.new(#2962FF, 85), "Tokyo",  "1000-1500", "Asia/Tokyo"),
+    SessionInfo.new(color.new(#FF9800, 85), "London", "0830-1415", "Europe/London"),
+    SessionInfo.new(color.new(#089981, 85), "NY",     "0930-1600", "America/New_York"))
+
+int dayMs = 24 * 60 * 60 * 1000
+int extendMs = 3 * dayMs
+
+createSession(SessionInfo this) =>
+    float hi = high
+    float lo = low
+    line hiLine = line.new(time, hi, time, hi, xloc=xloc.bar_time, color=this.col, width=1)
+    line loLine = line.new(time, lo, time, lo, xloc=xloc.bar_time, color=this.col, width=1)
+    label hiLb = label.new(bar_index, hi, this.name + " H", style=label.style_label_left, color=color.new(this.col, 80), textcolor=this.col, size=size.small)
+    label loLb = label.new(bar_index, lo, this.name + " L", style=label.style_label_left, color=color.new(this.col, 80), textcolor=this.col, size=size.small)
+    this.active := SessionDisp.new(hiLine, loLine, hi, lo, false, hiLb, loLb)
+
+updateSession(SessionInfo this) =>
+    SessionDisp d = this.active
+    d.hi := math.max(d.hi, high)
+    d.lo := math.min(d.lo, low)
+    line.set_x2(d.hiLine, time)
+    line.set_y2(d.hiLine, d.hi)
+    line.set_y1(d.hiLine, d.hi)
+    line.set_x2(d.loLine, time)
+    line.set_y2(d.loLine, d.lo)
+    line.set_y1(d.loLine, d.lo)
+    label.set_x(d.hiLabel, bar_index + 1)
+    label.set_y(d.hiLabel, d.hi)
+    label.set_x(d.loLabel, bar_index + 1)
+    label.set_y(d.loLabel, d.lo)
+
+finalizeSession(SessionInfo this) =>
+    SessionDisp d = this.active
+    if not d.finalized
+        int endT = time
+        int extT = endT + extendMs
+        line.set_x1(d.hiLine, endT)
+        line.set_x2(d.hiLine, extT)
+        line.set_y1(d.hiLine, d.hi)
+        line.set_y2(d.hiLine, d.hi)
+        line.set_x1(d.loLine, endT)
+        line.set_x2(d.loLine, extT)
+        line.set_y1(d.loLine, d.lo)
+        line.set_y2(d.loLine, d.lo)
+        label.set_x(d.hiLabel, bar_index + 1)
+        label.set_y(d.hiLabel, d.hi)
+        label.set_x(d.loLabel, bar_index + 1)
+        label.set_y(d.loLabel, d.lo)
+        d.finalized := true
 
 // ─── Killzones ───────────────────────────────────────────────────────────────
 nySess = time(timeframe.period, "0930-1600", "America/New_York")
@@ -199,31 +240,36 @@ if levelType == "Daily"
     lonHiSweep  := false
     lonLoSweep  := false
 else
-    // ─── Session High/Low tracking (no lines drawn) ────────────────────────────
-    var SessionState tokyo  = SessionState.new("Tokyo",  "1000-1500", "Asia/Tokyo",       color.new(#2962FF, 0))
-    var SessionState london = SessionState.new("London", "0830-1415", "Europe/London",    color.new(#FF9800, 0))
-    var SessionState ny     = SessionState.new("NY",     "0930-1600", "America/New_York", color.new(#089981, 0))
-
+    // ─── Session H/L Lines (from sessionn_lines.pine) ─────────────────────────
     if timeframe.isintraday
-        sessionUpdate(tokyo)
-        sessionUpdate(london)
-        sessionUpdate(ny)
+        for info in sessionInfos
+            bool isChange = timeframe.change("1D")
+            bool inSess = not na(time("", info.session, info.tz))
+            if inSess
+                if na(info.active) or isChange
+                    createSession(info)
+                else
+                    updateSession(info)
+            else
+                if not na(info.active)
+                    finalizeSession(info)
+                    info.active := na
 
     // Sweep detection using session levels
     if showSweep
-        tokyoHiSweep  = not na(tokyo.hi) and high > tokyo.hi + swp and close < tokyo.hi
-        tokyoLoSweep  = not na(tokyo.lo) and low  < tokyo.lo - swp and close > tokyo.lo
-        londonHiSweep = not na(london.hi) and high > london.hi + swp and close < london.hi
-        londonLoSweep = not na(london.lo) and low  < london.lo - swp and close > london.lo
-        nyHiSweep     = not na(ny.hi) and high > ny.hi + swp and close < ny.hi
-        nyLoSweep     = not na(ny.lo) and low  < ny.lo - swp and close > ny.lo
-        if tokyoHiSweep or londonHiSweep or nyHiSweep
+        sweepHi = false; sweepLo = false
+        for info in sessionInfos
+            if not na(info.active)
+                if high > info.active.hi + swp and close < info.active.hi
+                    sweepHi := true
+                if low < info.active.lo - swp and close > info.active.lo
+                    sweepLo := true
+        if sweepHi
             label.new(bar_index, high, " SWEEP", color=color.new(#FF5252, 30), style=label.style_label_down, textcolor=color.white, size=size.tiny)
-        if tokyoLoSweep or londonLoSweep or nyLoSweep
+        if sweepLo
             label.new(bar_index, low, " SWEEP", color=color.new(#69F0AE, 30), style=label.style_label_up, textcolor=color.white, size=size.tiny)
-        // Reuse alert variables
-        asiaHiSweep := tokyoHiSweep or londonHiSweep or nyHiSweep
-        asiaLoSweep := tokyoLoSweep or londonLoSweep or nyLoSweep
+        asiaHiSweep := sweepHi
+        asiaLoSweep := sweepLo
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
