@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import warnings
+from pytz import timezone as tzfunc
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════
@@ -25,7 +26,7 @@ warnings.filterwarnings("ignore")
 SYMBOL        = "AUDUSD"
 TIMEFRAMES    = ["M1", "M15", "H1"]        # Base, FVG, trend
 BACKTEST_DAYS = 60                          # Days of history to fetch
-USE_TICKS     = False                       # True=tick-level (slow), False=M1 bars (fast)
+USE_TICKS     = True                        # True=tick-level (slow), False=M1 bars (fast)
 
 # Strategy params (matching MQ5 EA)
 LOT_SIZE      = 0.1
@@ -33,7 +34,15 @@ TP_SL_RATIO   = 2
 SL_POINTS     = 200
 SWEEP_LOOKBACK = 12     # bars on current TF
 FVG_MIN_PTS   = 30      # minimum FVG gap in points
+DOL_MIN_PTS   = 50      # minimum DOL swing in points
 MAGIC         = 202406
+USE_NY_FILTER = True    # Only enter during NY session
+
+# Session times (Madrid timezone - matching Pine script)
+NY_START      = 15       # NY session start hour (15:00 Madrid)
+NY_END        = 22       # NY session end hour (22:00 Madrid)
+LON_START     = 9        # London session start hour
+LON_END       = 17       # London session end hour
 
 # MACD params
 MACD_FAST     = 12
@@ -221,6 +230,45 @@ def trend_from_macd(df):
 # ═══════════════════════════════════════════════════════════════════
 # Backtest Engine
 # ═══════════════════════════════════════════════════════════════════
+def in_ny_session(t, tz='Europe/Madrid'):
+    """Check if time is within NY session (configured hours)."""
+    tz_obj = tzfunc(tz)
+    local_t = t.tz_localize('UTC').tz_convert(tz_obj)
+    return NY_START <= local_t.hour < NY_END
+
+def detect_ifvg(df):
+    """iFVG detection: (prev bar bearish close below prev low, current closes above prev high = bullish)."""
+    bull = pd.Series(index=df.index, dtype=bool); bull[:] = False
+    bear = pd.Series(index=df.index, dtype=bool); bear[:] = False
+    for i in range(2, len(df)):
+        m_op = df["Open"].iloc[i-1]
+        m_cl = df["Close"].iloc[i-1]
+        m_hi1 = df["High"].iloc[i-2]
+        m_lo1 = df["Low"].iloc[i-2]
+        if m_cl < m_op and m_cl < m_lo1 and df["Close"].iloc[i] > m_hi1:
+            bull.iloc[i] = True
+        if m_cl > m_op and m_cl > m_hi1 and df["Close"].iloc[i] < m_lo1:
+            bear.iloc[i] = True
+    return bull, bear
+
+def detect_dol_levels(df, min_gap, left=4, right=4):
+    """DOL swing high/low detection with minimum gap filter."""
+    ph = pd.Series(index=df.index, dtype=float); ph[:] = np.nan
+    pl = pd.Series(index=df.index, dtype=float); pl[:] = np.nan
+    hi = df["High"].values; lo = df["Low"].values
+    last_hi = None
+    last_lo = None
+    for i in range(left, len(hi) - right):
+        if all(hi[i] > hi[i+j] for j in range(-left, right+1) if j != 0):
+            if last_lo is None or hi[i] - last_lo >= min_gap:
+                ph.iloc[i] = hi[i]
+                last_hi = hi[i]
+        if all(lo[i] < lo[i+j] for j in range(-left, right+1) if j != 0):
+            if last_hi is None or last_hi - lo[i] >= min_gap:
+                pl.iloc[i] = lo[i]
+                last_lo = lo[i]
+    return ph, pl
+
 def run_backtest(df_m1, df_m15, df_h1, point_size, tick_data=None):
     """
     Run the ManipulationX V.6 backtest.
@@ -266,6 +314,13 @@ def run_backtest(df_m1, df_m15, df_h1, point_size, tick_data=None):
 
     fvg_lookback = pd.Timedelta(minutes=15 * 10)  # last 10 M15 bars
 
+    # Detect iFVG on M1 for entry triggers
+    df_m1["ifvgBull"], df_m1["ifvgBear"] = detect_ifvg(df_m1)
+
+    # Detect DOL on M15 for levels
+    dol_min = DOL_MIN_PTS * POINT if DOL_MIN_PTS else min_gap * 2
+    df_m15["dolHi"], df_m15["dolLo"] = detect_dol_levels(df_m15, dol_min)
+
     # --- Main loop on M1 ---
     trades = []
     in_trade = 0    # 1=long, -1=short, 0=none
@@ -274,20 +329,21 @@ def run_backtest(df_m1, df_m15, df_h1, point_size, tick_data=None):
     entry_dir = ""
     equity = [10000.0]
 
-    for i in range(1, len(df_m1)):
+    for i in range(2, len(df_m1)):
         t = df_m1.index[i]
         o = df_m1["Open"].iloc[i]
         hi = df_m1["High"].iloc[i]
         lo = df_m1["Low"].iloc[i]
         cl = df_m1["Close"].iloc[i]
+        ifvg_bull = df_m1["ifvgBull"].iloc[i]
+        ifvg_bear = df_m1["ifvgBear"].iloc[i]
+        ny_session = in_ny_session(t)
 
         if in_trade == 0:
-            # Check sweep + FVG on M15
             sweep_b = nearest_prev(df_m15, t, "sBul")
             sweep_r = nearest_prev(df_m15, t, "sBer")
             trend_bias = get_h1_trend(t)
 
-            # Check if FVG formed recently
             m15_idx = df_m15.index.searchsorted(t)
             fvg_near_b = False
             fvg_near_r = False
@@ -297,12 +353,13 @@ def run_backtest(df_m1, df_m15, df_h1, point_size, tick_data=None):
                 if df_m15["fvgBear"].iloc[j]:
                     fvg_near_r = True
 
-            if sweep_b and fvg_near_b and trend_bias != -1:
+            # Entry: iFVG triggered within NY session after sweep+FVG setup
+            if ifvg_bull and ny_session and fvg_near_b and trend_bias != -1:
                 in_trade = 1
                 entry_price = cl
                 entry_time = t
                 entry_dir = "long"
-            elif sweep_r and fvg_near_r and trend_bias != 1:
+            elif ifvg_bear and ny_session and fvg_near_r and trend_bias != 1:
                 in_trade = -1
                 entry_price = cl
                 entry_time = t
@@ -390,8 +447,21 @@ def plot_results(trades, equity, df_m1, df_m15, df_h1, save_path=None):
         gridspec_kw={"height_ratios": [3, 0.8, 1]})
     fig.suptitle(f"ManipulationX V.6 — {SYMBOL} MT5 Backtest (Tick Data)", fontsize=14, fontweight="bold")
 
-    # Price (plot weekly to avoid clutter)
+    # Price
     ax1.plot(df_m1.index, df_m1["Close"], color="#1a1a2e", lw=0.5, label=SYMBOL, zorder=2)
+
+    # Session boxes
+    from pytz import timezone as tzfunc
+    tz_obj = tzfunc('Europe/Madrid')
+    dates = df_m1.index.normalize().unique()
+    for d in dates:
+        for start_h, end_h, color, alpha, name in [
+            (NY_START, NY_END, '#9C27B0', 0.04, 'NY'),
+            (LON_START, LON_END, '#2196F3', 0.03, 'LON')
+        ]:
+            start_t = d + timedelta(hours=start_h)
+            end_t = d + timedelta(hours=end_h)
+            ax1.axvspan(start_t, end_t, alpha=alpha, color=color, zorder=0)
 
     # FVG bands on M15
     for i in range(len(df_m15)):
