@@ -100,6 +100,15 @@ var float nyL = na
 var int nyStart = na
 var box nyBox = na
 
+var float asiaFinalHi = na
+var float asiaFinalLo = na
+var float sydFinalHi = na
+var float sydFinalLo = na
+var float lonFinalHi = na
+var float lonFinalLo = na
+var float nyFinalHi = na
+var float nyFinalLo = na
+
 if showSessions and showSessBoxes
     if entered(asiaIn)
         asiaH := high
@@ -117,6 +126,8 @@ if showSessions and showSessBoxes
         if exited(asiaIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
             label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
+            asiaFinalHi := asiaH
+            asiaFinalLo := asiaL
             asiaH := na
             asiaL := na
             asiaStart := na
@@ -138,6 +149,8 @@ if showSessions and showSessBoxes
         if exited(sydIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
             label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
+            sydFinalHi := sydH
+            sydFinalLo := sydL
             sydH := na
             sydL := na
             sydStart := na
@@ -159,6 +172,8 @@ if showSessions and showSessBoxes
         if exited(londonIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
             label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
+            lonFinalHi := lonH
+            lonFinalLo := lonL
             lonH := na
             lonL := na
             lonStart := na
@@ -180,6 +195,8 @@ if showSessions and showSessBoxes
         if exited(nySessIn)
             line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
             label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
+            nyFinalHi := nyH
+            nyFinalLo := nyL
             nyH := na
             nyL := na
             nyStart := na
@@ -308,6 +325,33 @@ asiaHiSweep := dHiSweep
 asiaLoSweep := dLoSweep
 lonHiSweep := false
 lonLoSweep := false
+
+// Session level sweeps (using finalized session hi/lo)
+if showSweep
+    sessSweepHi = false
+    sessSweepLo = false
+    if not na(asiaFinalHi) and high > asiaFinalHi + swp and close < asiaFinalHi
+        sessSweepHi := true
+    if not na(asiaFinalLo) and low < asiaFinalLo - swp and close > asiaFinalLo
+        sessSweepLo := true
+    if not na(sydFinalHi) and high > sydFinalHi + swp and close < sydFinalHi
+        sessSweepHi := true
+    if not na(sydFinalLo) and low < sydFinalLo - swp and close > sydFinalLo
+        sessSweepLo := true
+    if not na(lonFinalHi) and high > lonFinalHi + swp and close < lonFinalHi
+        sessSweepHi := true
+    if not na(lonFinalLo) and low < lonFinalLo - swp and close > lonFinalLo
+        sessSweepLo := true
+    if not na(nyFinalHi) and high > nyFinalHi + swp and close < nyFinalHi
+        sessSweepHi := true
+    if not na(nyFinalLo) and low < nyFinalLo - swp and close > nyFinalLo
+        sessSweepLo := true
+    if sessSweepHi
+        label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+    if sessSweepLo
+        label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+    asiaHiSweep := asiaHiSweep or sessSweepHi
+    asiaLoSweep := asiaLoSweep or sessSweepLo
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
