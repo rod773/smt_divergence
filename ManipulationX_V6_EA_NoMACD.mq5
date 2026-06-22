@@ -3,7 +3,7 @@
 //|                         Pure replication of Pine Script logic    |
 //+------------------------------------------------------------------+
 #property copyright "ManipulationX V.6"
-#property version   "1.00"
+#property version   "1.01"
 #property description "Pure EA from ManipulationX V.6 Pine Script (no MACD)"
 #property description "FVG zones, iFVG triggers, SMT divergence, sweeps, DOL/SR"
 
@@ -24,351 +24,296 @@ input int      InpMagicNumber  = 202406;           // Magic number
 //+------------------------------------------------------------------+
 //| Structures                                                       |
 //+------------------------------------------------------------------+
-struct FvgZone {
-   double   hi;
-   double   lo;
-   int      dir;       // 1 bull, -1 bear
-   datetime formedAt;
+struct FvgLevel {
+   double hi, lo;
+   int    dir;        // 1 bull, -1 bear
+   datetime t;
 };
-FvgZone fvgList[100];
-int fvgCount = 0;
+FvgLevel fvg[100];
+int fvgN = 0;
 
 //+------------------------------------------------------------------+
 //| Globals                                                          |
 //+------------------------------------------------------------------+
-datetime lastBarTime = 0;
-double   lastNqLo = 0, lastEsLo = 0;
-double   lastNqHi = 0, lastEsHi = 0;
-int      lastNqLoBar = 0, lastEsLoBar = 0;
-int      lastNqHiBar = 0, lastEsHiBar = 0;
-int      smtBias = 0;     // 1 bull, -1 bear, 0 none
+datetime lastBar = 0;
+double   lastNqLo=0, lastEsLo=0, lastNqHi=0, lastEsHi=0;
+int      smtBias = 0;
 
-// DOL tracking
-double   lastDolHi = 0, lastDolLo = 0;
-string   dolLast = "";
+// DOL
+double   dolHi=0, dolLo=0;
+string   dolLast="";
 
-// Session level tracking (Asia 19:00-03:00 ET, London 03:00-12:00 ET)
-int      asiaDate = 0, lonDate = 0;
-double   asiaHi = 0, asiaLo = 0;
-double   lonHi  = 0, lonLo  = 0;
-bool     asiaHiHit = false, asiaLoHit = false;
-bool     lonHiHit  = false, lonLoHit  = false;
-bool     asiaLevelSet = false, lonLevelSet = false;
+// Sessions
+int      asiaDay=0, lonDay=0;
+double   asiaHi=0, asiaLo=0, lonHi=0, lonLo=0;
+bool     asiaHiHit=false, asiaLoHit=false, lonHiHit=false, lonLoHit=false;
+bool     asiaDone=false, lonDone=false;
 
 //+------------------------------------------------------------------+
-//| Helper: read rates                                               |
+//| Helpers                                                          |
 //+------------------------------------------------------------------+
-bool GetRates(string symbol, ENUM_TIMEFRAMES tf, MqlRates &r[], int count) {
+bool GetR(string s, ENUM_TIMEFRAMES tf, MqlRates &r[], int n) {
    ArraySetAsSeries(r, true);
-   return CopyRates(symbol, tf, 0, count, r) >= count;
+   return CopyRates(s, tf, 0, n, r) >= n;
 }
 
 //+------------------------------------------------------------------+
-//| 3-bar FVG: store new FVG zones                                   |
+//| FVG scan: store new zones                                        |
 //+------------------------------------------------------------------+
-void ScanFVG(string symbol, ENUM_TIMEFRAMES tf, int scanBars) {
+void ScanFVG(string sym, ENUM_TIMEFRAMES tf, int scan) {
    MqlRates r[];
-   int need = scanBars + 2;
+   int need = scan + 2;
    ArrayResize(r, need);
-   if (!GetRates(symbol, tf, r, need)) return;
-   for (int i = 1; i <= scanBars - 2; i++) {
-      if (i + 2 >= ArraySize(r)) break;
-      double gapBull = r[i].low - r[i+2].high;
-      double gapBear = r[i+2].low - r[i].high;
-      int dir = 0;
-      if (gapBull >= InpFvgMinPts * _Point) dir = 1;
-      else if (gapBear >= InpFvgMinPts * _Point) dir = -1;
-      if (dir != 0) {
-         // Avoid duplicates: same level already stored recently
-         bool dup = false;
-         for (int j = 0; j < fvgCount && !dup; j++) {
-            if (MathAbs(fvgList[j].hi - r[i].high) < 10 * _Point &&
-                MathAbs(fvgList[j].lo - r[i].low) < 10 * _Point)
-               dup = true;
-         }
-         if (!dup && fvgCount < 100) {
-            fvgList[fvgCount].hi = (dir == 1) ? r[i].low : r[i].high;
-            fvgList[fvgCount].lo = (dir == 1) ? r[i+2].high : r[i+2].low;
-            fvgList[fvgCount].dir = dir;
-            fvgList[fvgCount].formedAt = TimeCurrent();
-            fvgCount++;
-         }
+   if (!GetR(sym, tf, r, need)) return;
+   for (int i = 1; i <= scan - 2; i++) {
+      if (i+2 >= ArraySize(r)) break;
+      double gb = r[i].low - r[i+2].high;
+      double gs = r[i+2].low - r[i].high;
+      int d = 0;
+      if (gb >= InpFvgMinPts * _Point) d = 1;
+      else if (gs >= InpFvgMinPts * _Point) d = -1;
+      if (d == 0) continue;
+      bool dup = false;
+      for (int j = 0; j < fvgN && !dup; j++)
+         if (MathAbs(fvg[j].hi - r[i].high) < 10*_Point && MathAbs(fvg[j].lo - r[i].low) < 10*_Point) dup = true;
+      if (!dup && fvgN < 100) {
+         fvg[fvgN].hi = (d==1)?r[i].low:r[i].high;
+         fvg[fvgN].lo = (d==1)?r[i+2].high:r[i+2].low;
+         fvg[fvgN].dir = d;
+         fvg[fvgN].t = TimeCurrent();
+         fvgN++;
       }
    }
 }
 
-//+------------------------------------------------------------------+
-//| Check if price is near an active FVG zone                        |
-//+------------------------------------------------------------------+
 int NearFVG(double price) {
-   int res = 0;
-   for (int i = 0; i < fvgCount; i++) {
-      double zoneHi = fvgList[i].hi;
-      double zoneLo = fvgList[i].lo;
-      double dist = 5 * _Point; // within 5 pips
-      if (price >= zoneLo - dist && price <= zoneHi + dist) {
-         if (fvgList[i].dir == 1) res = 1;   // near bullish FVG
-         else res = -1;
-      }
+   for (int i=0; i<fvgN; i++) {
+      double d = 5*_Point;
+      if (price >= fvg[i].lo-d && price <= fvg[i].hi+d) return fvg[i].dir;
    }
-   return res;
-}
-
-//+------------------------------------------------------------------+
-//| iFVG: check last N 1m bars for trap signals                      |
-//+------------------------------------------------------------------+
-int CheckIFVG() {
-   MqlRates r[3];
-   if (!GetRates(_Symbol, PERIOD_M1, r, 3)) return 0;
-   // bIFVG: 1m close < 1m open AND 1m close < prev 1m low AND current close > prev 1m high
-   bool bIFVG = (r[0].close < r[0].open) && (r[0].close < r[1].low) && (r[0].close > r[1].high);
-   // Actually the Pine says: close > mHi1 (current chart close > prev 1m high)
-   // r[0] is the last completed 1m bar, r[2] is 2 bars ago
-   // Let me re-check: bIFVG = mCl < mOp and mCl < mLo1 and close > mHi1
-   // mCl = close of "1" timeframe bar, mOp = open, mLo1 = low[1], mHi1 = high[1]
-   bIFVG = (r[0].close < r[0].open) && (r[0].close < r[1].low) && (r[0].close > r[1].high);
-   bool sIFVG = (r[0].close > r[0].open) && (r[0].close > r[1].high) && (r[0].close < r[1].low);
-   if (bIFVG) return 1;
-   if (sIFVG) return -1;
    return 0;
 }
 
 //+------------------------------------------------------------------+
-//| SMT Divergence                                                   |
+//| iFVG: scan last 15 completed 1m bars vs prev M15 close           |
+//+------------------------------------------------------------------+
+int CheckIFVG() {
+   MqlRates r1[18], r15[3];
+   if (!GetR(_Symbol, PERIOD_M1,  r1, 18)) return 0;
+   if (!GetR(_Symbol, PERIOD_M15, r15, 3)) return 0;
+   // r1[0]=latest completed M1, r15[1]=prev completed M15 bar
+   // Scan pairs (i,i+1) within the last ~15 M1 bars
+   for (int i = 0; i <= 14; i++) {
+      if (i+2 >= ArraySize(r1)) break;
+      // bIFVG: M1 bar[i] closed bearish below bar[i+1].low, AND M15 close above bar[i+1].high
+      bool b = r1[i].close < r1[i].open && r1[i].close < r1[i+1].low && r15[1].close > r1[i+1].high;
+      // sIFVG: M1 bar[i] closed bullish above bar[i+1].high, AND M15 close below bar[i+1].low
+      bool s = r1[i].close > r1[i].open && r1[i].close > r1[i+1].high && r15[1].close < r1[i+1].low;
+      if (b) return 1;
+      if (s) return -1;
+   }
+   return 0;
+}
+
+//+------------------------------------------------------------------+
+//| SMT divergence                                                   |
 //+------------------------------------------------------------------+
 int CheckSMT() {
    MqlRates r1[10], r2[10];
-   if (!GetRates(_Symbol, PERIOD_CURRENT, r1, 10)) return 0;
-   if (!GetRates(InpCorrSymbol, PERIOD_CURRENT, r2, 10)) return 0;
-   double nqLo = 0, nqHi = 0, esLo = 0, esHi = 0;
-   for (int i = 2; i <= 6; i++) {
-      if (r1[i].low  <= r1[i-1].low && r1[i].low  <= r1[i-2].low && r1[i].low  <= r1[i+1].low  && r1[i].low  <= r1[i+2].low) nqLo = r1[i].low;
-      if (r1[i].high >= r1[i-1].high && r1[i].high >= r1[i-2].high && r1[i].high >= r1[i+1].high && r1[i].high >= r1[i+2].high) nqHi = r1[i].high;
-      if (r2[i].low  <= r2[i-1].low && r2[i].low  <= r2[i-2].low && r2[i].low  <= r2[i+1].low  && r2[i].low  <= r2[i+2].low) esLo = r2[i].low;
-      if (r2[i].high >= r2[i-1].high && r2[i].high >= r2[i-2].high && r2[i].high >= r2[i+1].high && r2[i].high >= r2[i+2].high) esHi = r2[i].high;
+   if (!GetR(_Symbol, PERIOD_CURRENT, r1, 10)) return 0;
+   if (!GetR(InpCorrSymbol, PERIOD_CURRENT, r2, 10)) return 0;
+   double nqLo=0, nqHi=0, esLo=0, esHi=0;
+   for (int i=2; i<=6; i++) {
+      bool l1 = r1[i].low<=r1[i-1].low && r1[i].low<=r1[i-2].low && r1[i].low<=r1[i+1].low && r1[i].low<=r1[i+2].low;
+      bool h1 = r1[i].high>=r1[i-1].high && r1[i].high>=r1[i-2].high && r1[i].high>=r1[i+1].high && r1[i].high>=r1[i+2].high;
+      bool l2 = r2[i].low<=r2[i-1].low && r2[i].low<=r2[i-2].low && r2[i].low<=r2[i+1].low && r2[i].low<=r2[i+2].low;
+      bool h2 = r2[i].high>=r2[i-1].high && r2[i].high>=r2[i-2].high && r2[i].high>=r2[i+1].high && r2[i].high>=r2[i+2].high;
+      if (l1) nqLo = r1[i].low;  if (h1) nqHi = r1[i].high;
+      if (l2) esLo = r2[i].low;  if (h2) esHi = r2[i].high;
    }
    int sig = 0;
-   if (nqLo != 0 && lastNqLo != 0 && esLo != 0 && lastEsLo != 0) {
-      if (nqLo > lastNqLo && esLo < lastEsLo) sig = 1;
-   }
-   if (nqHi != 0 && lastNqHi != 0 && esHi != 0 && lastEsHi != 0) {
-      if (nqHi < lastNqHi && esHi > lastEsHi) sig = -1;
-   }
-   if (nqLo != 0) { lastNqLo = nqLo; lastEsLo = (esLo != 0) ? esLo : lastEsLo; }
-   if (nqHi != 0) { lastNqHi = nqHi; lastEsHi = (esHi != 0) ? esHi : lastEsHi; }
+   if (nqLo&&lastNqLo&&esLo&&lastEsLo) { if (nqLo>lastNqLo && esLo<lastEsLo) sig=1; }
+   if (nqHi&&lastNqHi&&esHi&&lastEsHi) { if (nqHi<lastNqHi && esHi>lastEsHi) sig=-1; }
+   if (nqLo) { lastNqLo=nqLo; if(esLo)lastEsLo=esLo; }
+   if (nqHi) { lastNqHi=nqHi; if(esHi)lastEsHi=esHi; }
    return sig;
 }
 
 //+------------------------------------------------------------------+
-//| Session update                                                   |
+//| Sessions + sweeps                                                |
 //+------------------------------------------------------------------+
 void UpdateSessions() {
    MqlDateTime dt;
    TimeCurrent(dt);
-   int todayNum = dt.year * 10000 + dt.mon * 100 + dt.day;
-   // Asia: 19:00-03:00 ET ≈ 00:00-08:00 UTC
-   int utcHour = dt.hour;
-   bool inAsia = (utcHour >= 0 && utcHour < 8);
-   bool inLon  = (utcHour >= 8 && utcHour < 17);
+   int today = dt.year*10000 + dt.mon*100 + dt.day;
+   bool asia = (dt.hour>=0 && dt.hour<8);
+   bool lon  = (dt.hour>=8 && dt.hour<17);
 
-   if (inAsia && asiaDate != todayNum) {
-      asiaDate = todayNum;
-      asiaHi = 0; asiaLo = 99999;
-      asiaHiHit = false; asiaLoHit = false;
-      asiaLevelSet = false;
+   if (asia && asiaDay!=today) {
+      asiaDay = today; asiaDone = false;
+      asiaHiHit=false; asiaLoHit=false;
       MqlRates r[1];
-      if (GetRates(_Symbol, PERIOD_CURRENT, r, 1)) {
-         asiaHi = r[0].high; asiaLo = r[0].low;
+      if (GetR(_Symbol, PERIOD_CURRENT, r, 1)) { asiaHi=r[0].high; asiaLo=r[0].low; }
+   }
+   if (asia && asiaHi!=0) {
+      MqlRates r[1];
+      if (GetR(_Symbol, PERIOD_CURRENT, r, 1)) {
+         if (r[0].high>asiaHi) asiaHi=r[0].high;
+         if (r[0].low<asiaLo) asiaLo=r[0].low;
       }
    }
-   if (inAsia && asiaHi != 0) {
-      MqlRates r[1];
-      if (GetRates(_Symbol, PERIOD_CURRENT, r, 1)) {
-         if (r[0].high > asiaHi) asiaHi = r[0].high;
-         if (r[0].low  < asiaLo) asiaLo = r[0].low;
-      }
-   }
-   if (!inAsia && asiaHi != 0 && !asiaLevelSet) {
-      asiaLevelSet = true; // level finalized when session ends
-   }
+   if (!asia && asiaHi!=0) asiaDone=true;
 
-   if (inLon && lonDate != todayNum) {
-      lonDate = todayNum;
-      lonHi = 0; lonLo = 99999;
-      lonHiHit = false; lonLoHit = false;
-      lonLevelSet = false;
+   if (lon && lonDay!=today) {
+      lonDay = today; lonDone = false;
+      lonHiHit=false; lonLoHit=false;
       MqlRates r[1];
-      if (GetRates(_Symbol, PERIOD_CURRENT, r, 1)) {
-         lonHi = r[0].high; lonLo = r[0].low;
+      if (GetR(_Symbol, PERIOD_CURRENT, r, 1)) { lonHi=r[0].high; lonLo=r[0].low; }
+   }
+   if (lon && lonHi!=0) {
+      MqlRates r[1];
+      if (GetR(_Symbol, PERIOD_CURRENT, r, 1)) {
+         if (r[0].high>lonHi) lonHi=r[0].high;
+         if (r[0].low<lonLo) lonLo=r[0].low;
       }
    }
-   if (inLon && lonHi != 0) {
-      MqlRates r[1];
-      if (GetRates(_Symbol, PERIOD_CURRENT, r, 1)) {
-         if (r[0].high > lonHi) lonHi = r[0].high;
-         if (r[0].low  < lonLo) lonLo = r[0].low;
-      }
-   }
-   if (!inLon && lonHi != 0 && !lonLevelSet) {
-      lonLevelSet = true;
-   }
+   if (!lon && lonHi!=0) lonDone=true;
 }
 
-//+------------------------------------------------------------------+
-//| Sweep detection on session levels                                |
-//+------------------------------------------------------------------+
-int CheckSessionSweep() {
-   MqlRates r[1];
-   if (!GetRates(_Symbol, PERIOD_CURRENT, r, 1)) return 0;
+int CheckSweep() {
+   MqlRates r[2];
+   if (!GetR(_Symbol, PERIOD_M15, r, 2)) return 0;
+   // Check PREVIOUS completed M15 bar (index 1) for sweep against session levels
    double swp = InpSweepPts * _Point;
    // Asia sweeps
-   if (asiaLevelSet && asiaHi != 0 && !asiaHiHit && r[0].high > asiaHi + swp && r[0].close < asiaHi) {
-      asiaHiHit = true; return -1;
-   }
-   if (asiaLevelSet && asiaLo != 0 && !asiaLoHit && r[0].low < asiaLo - swp && r[0].close > asiaLo) {
-      asiaLoHit = true; return 1;
-   }
+   if (asiaDone && asiaHi!=0 && !asiaHiHit && r[1].high>asiaHi+swp && r[1].close<asiaHi) { asiaHiHit=true; return -1; }
+   if (asiaDone && asiaLo!=0 && !asiaLoHit && r[1].low<asiaLo-swp && r[1].close>asiaLo) { asiaLoHit=true; return 1; }
    // London sweeps
-   if (lonLevelSet && lonHi != 0 && !lonHiHit && r[0].high > lonHi + swp && r[0].close < lonHi) {
-      lonHiHit = true; return -1;
-   }
-   if (lonLevelSet && lonLo != 0 && !lonLoHit && r[0].low < lonLo - swp && r[0].close > lonLo) {
-      lonLoHit = true; return 1;
-   }
+   if (lonDone && lonHi!=0 && !lonHiHit && r[1].high>lonHi+swp && r[1].close<lonHi) { lonHiHit=true; return -1; }
+   if (lonDone && lonLo!=0 && !lonLoHit && r[1].low<lonLo-swp && r[1].close>lonLo) { lonLoHit=true; return 1; }
    return 0;
 }
 
 //+------------------------------------------------------------------+
-//| DOL update                                                       |
+//| DOL                                                              |
 //+------------------------------------------------------------------+
 void UpdateDOL() {
    MqlRates r[10];
-   if (!GetRates(_Symbol, PERIOD_CURRENT, r, 10)) return;
-   double ph = 0, pl = 0;
-   for (int i = 4; i <= 6; i++) {
-      if (r[i].high >= r[i-1].high && r[i].high >= r[i-2].high && r[i].high >= r[i-3].high && r[i].high >= r[i-4].high &&
-          r[i].high >= r[i+1].high && r[i].high >= r[i+2].high && r[i].high >= r[i+3].high && r[i].high >= r[i+4].high)
+   if (!GetR(_Symbol, PERIOD_M15, r, 10)) return;
+   double ph=0, pl=0;
+   for (int i=4; i<=6; i++) {
+      if (r[i].high>=r[i-1].high && r[i].high>=r[i-2].high && r[i].high>=r[i-3].high && r[i].high>=r[i-4].high &&
+          r[i].high>=r[i+1].high && r[i].high>=r[i+2].high && r[i].high>=r[i+3].high && r[i].high>=r[i+4].high)
          ph = r[i].high;
-      if (r[i].low  <= r[i-1].low  && r[i].low  <= r[i-2].low  && r[i].low  <= r[i-3].low  && r[i].low  <= r[i-4].low  &&
-          r[i].low  <= r[i+1].low  && r[i].low  <= r[i+2].low  && r[i].low  <= r[i+3].low  && r[i].low  <= r[i+4].low)
+      if (r[i].low<=r[i-1].low && r[i].low<=r[i-2].low && r[i].low<=r[i-3].low && r[i].low<=r[i-4].low &&
+          r[i].low<=r[i+1].low && r[i].low<=r[i+2].low && r[i].low<=r[i+3].low && r[i].low<=r[i+4].low)
          pl = r[i].low;
    }
-   if (ph != 0 && (dolLast == "" || dolLast == "low") &&
-       (lastDolLo == 0 || ph - lastDolLo >= 16 * _Point)) {
-      lastDolHi = ph; dolLast = "high";
-   }
-   if (pl != 0 && (dolLast == "" || dolLast == "high") &&
-       (lastDolHi == 0 || lastDolHi - pl >= 16 * _Point)) {
-      lastDolLo = pl; dolLast = "low";
-   }
+   double minD = 16 * _Point;
+   if (ph && (dolLast==""||dolLast=="low") && (dolLo==0||ph-dolLo>=minD)) { dolHi=ph; dolLast="high"; }
+   if (pl && (dolLast==""||dolLast=="high") && (dolHi==0||dolHi-pl>=minD)) { dolLo=pl; dolLast="low"; }
 }
 
 //+------------------------------------------------------------------+
-//| Main entry logic                                                 |
-//| Entry: sweep near FVG zone, or IFVG near FVG zone                |
+//| Entry logic                                                      |
 //+------------------------------------------------------------------+
 int GetEntrySignal() {
-   // 1. Scan for new FVG zones (on each call, keep list fresh)
-   ScanFVG(_Symbol, PERIOD_M15, 10);
-   ScanFVG(_Symbol, PERIOD_H1, 12);
-   ScanFVG(_Symbol, PERIOD_H4, 8);
-   // Prune old zones (>24h)
+   // Prune old FVG zones (>12h)
    int kept = 0;
-   for (int i = 0; i < fvgCount; i++) {
-      if (TimeCurrent() - fvgList[i].formedAt < 86400) // 24h
-         fvgList[kept++] = fvgList[i];
+   for (int i=0; i<fvgN; i++) {
+      if (TimeCurrent()-fvg[i].t < 43200) fvg[kept++]=fvg[i];
    }
-   fvgCount = kept;
+   fvgN = kept;
 
-   // 2. SMT bias
+   // Scan fresh FVGs
+   ScanFVG(_Symbol, PERIOD_M15, 8);
+   ScanFVG(_Symbol, PERIOD_H1,  10);
+   ScanFVG(_Symbol, PERIOD_H4,  6);
+
+   // SMT bias
    int smt = CheckSMT();
    if (smt != 0) smtBias = smt;
 
-   // 3. Check IFVG
+   MqlRates r[2];
+   GetR(_Symbol, PERIOD_M15, r, 2);
+   double price = r[1].close;
+
+   // 1) IFVG trigger
    int ifvg = CheckIFVG();
    if (ifvg != 0) {
-      MqlRates r[1];
-      GetRates(_Symbol, PERIOD_CURRENT, r, 1);
-      double price = r[0].close;
-      int nearFvg = NearFVG(price);
-      // IFVG + FVG zone confluence
-      if (ifvg == 1 && nearFvg != -1) {
-         if (smtBias == -1) return 1; // long but careful with bearish SMT
-         return 2; // strong long
-      }
-      if (ifvg == -1 && nearFvg != 1) {
-         if (smtBias == 1) return -1;
-         return -2;
+      int nfvg = NearFVG(price);
+      if ((ifvg==1 && nfvg!=-1) || (ifvg==-1 && nfvg!=1)) {
+         if (ifvg==1) return (smtBias==-1)?1:2;
+         else return (smtBias==1)?-1:-2;
       }
    }
 
-   // 4. Check session sweep
-   int sweep = CheckSessionSweep();
+   // 2) Session sweep
+   int sweep = CheckSweep();
    if (sweep != 0) {
-      MqlRates r[1];
-      GetRates(_Symbol, PERIOD_CURRENT, r, 1);
-      int nearFvg = NearFVG(r[0].close);
-      if (sweep == 1 && nearFvg != -1) return 3;  // sweep long
-      if (sweep == -1 && nearFvg != 1) return -3; // sweep short
+      int nfvg = NearFVG(price);
+      if ((sweep==1 && nfvg!=-1) || (sweep==-1 && nfvg!=1))
+         return (sweep==1)?3:-3;
    }
 
    return 0;
 }
 
 //+------------------------------------------------------------------+
-//| Position check                                                   |
+//| Boilerplate                                                      |
 //+------------------------------------------------------------------+
-bool HasPosition() {
-   for (int i = PositionsTotal() - 1; i >= 0; i--) {
-      if (PositionSelectByTicket(PositionGetTicket(i))) {
-         if (PositionGetInteger(POSITION_MAGIC) == InpMagicNumber) return true;
-      }
-   }
+bool HasPos() {
+   for (int i=PositionsTotal()-1; i>=0; i--)
+      if (PositionSelectByTicket(PositionGetTicket(i)))
+         if (PositionGetInteger(POSITION_MAGIC)==InpMagicNumber) return true;
    return false;
 }
 
-//+------------------------------------------------------------------+
-//| OnInit                                                           |
-//+------------------------------------------------------------------+
 int OnInit() {
    trade.SetExpertMagicNumber(InpMagicNumber);
-   Print("ManipulationX V6 NoMACD EA on ", _Symbol, " ", EnumToString(Period()));
-   Print("Correlation pair: ", InpCorrSymbol);
+   Print("ManipulationX V6 NoMACD on ", _Symbol, " ", EnumToString(Period()));
+   Print("SMT pair: ", InpCorrSymbol);
    return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int) {}
 
-//+------------------------------------------------------------------+
-//| OnTick                                                           |
-//+------------------------------------------------------------------+
 void OnTick() {
-   datetime curBar = iTime(_Symbol, PERIOD_M15, 0);
-   if (curBar == lastBarTime) return;
-   lastBarTime = curBar;
+   datetime nb = iTime(_Symbol, PERIOD_M15, 0);
+   if (nb == lastBar) return;
+   lastBar = nb;
 
    UpdateSessions();
    UpdateDOL();
 
-   if (HasPosition()) return;
+   if (HasPos()) return;
 
-   int signal = GetEntrySignal();
-   if (signal == 0) return;
+   int sig = GetEntrySignal();
+
+   // Debug: show near-misses
+   int ifvg = CheckIFVG();
+   int sweep = CheckSweep();
+   MqlRates r[2]; GetR(_Symbol, PERIOD_M15, r, 2);
+   int nfvg = NearFVG(r[1].close);
+   if (ifvg!=0) PrintFormat("M15[%s] IFVG=%d NFVG=%d SMT=%d", TimeToString(nb), ifvg, nfvg, smtBias);
+   if (sweep!=0) PrintFormat("M15[%s] SWP=%d NFVG=%d SMT=%d", TimeToString(nb), sweep, nfvg, smtBias);
+
+   if (sig == 0) return;
 
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double sl, tp;
 
-   if (signal > 0) {
+   if (sig > 0) {
       sl = bid - InpSL_Points * _Point;
       tp = ask + InpSL_Points * InpTPSL_Ratio * _Point;
       if (trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "MX V6"))
-         Print("LONG signal=", signal, " smt=", smtBias);
+         Print(">>> LONG signal=", sig);
    } else {
       sl = ask + InpSL_Points * _Point;
       tp = bid - InpSL_Points * InpTPSL_Ratio * _Point;
       if (trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "MX V6"))
-         Print("SHORT signal=", signal, " smt=", smtBias);
+         Print(">>> SHORT signal=", sig);
    }
 }
 //+------------------------------------------------------------------+
