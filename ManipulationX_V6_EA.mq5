@@ -182,7 +182,8 @@ int CheckMACDTrend() {
 //| Liquidity sweep detection                                        |
 //+------------------------------------------------------------------+
 int CheckSweep() {
-   MqlRates r[InpSweepLookback+2];
+   MqlRates r[];
+   ArrayResize(r, InpSweepLookback+2);
    if (!GetRates(_Symbol, PERIOD_CURRENT, r, InpSweepLookback+2)) return 0;
    double hiLevel = r[1].high, loLevel = r[1].low;
    for (int i=2; i<InpSweepLookback+1; i++) {
