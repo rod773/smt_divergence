@@ -43,10 +43,10 @@ type SessionInfo
     string tz
     SessionDisp active = na
 
-var array<SessionInfo> sessionInfos = array.from(
-    SessionInfo.new(color.new(#2962FF, 85), "Tokyo",  "1000-1500", "Asia/Tokyo"),
-    SessionInfo.new(color.new(#FF9800, 85), "London", "0830-1415", "Europe/London"),
-    SessionInfo.new(color.new(#089981, 85), "NY",     "0930-1600", "America/New_York"))
+var array<SessionInfo> sessionInfos = array.new<SessionInfo>()
+sessionInfos.push(SessionInfo.new(color.new(#2962FF, 85), "Tokyo",  "1000-1500", "Asia/Tokyo"))
+sessionInfos.push(SessionInfo.new(color.new(#FF9800, 85), "London", "0830-1415", "Europe/London"))
+sessionInfos.push(SessionInfo.new(color.new(#089981, 85), "NY",     "0930-1600", "America/New_York"))
 
 int dayMs = 24 * 60 * 60 * 1000
 int extendMs = 3 * dayMs
