@@ -1,263 +1,253 @@
 """
-Backtest ManipulationX V.6 strategy on AUDUSD (daily data).
-Simulates: FVG zones, swing pivots (DOL/SR), liquidity sweeps, and entry signals.
+Backtest ManipulationX V.6 + MACD Divergences on AUDUSD.
+Signals: swing pivot sweeps + FVG zones + MACD regular divergences.
 """
 
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import Rectangle
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# ── Fetch AUDUSD data ──────────────────────────────────────────────────────────
+# ── Fetch AUDUSD data ─────────────────────────────────────────────────────────
 print("Downloading AUDUSD data...")
 raw = yf.download("AUDUSD=X", period="2y", interval="1d")
 df = raw.copy()
-df.columns = [c[0] for c in df.columns]  # flatten MultiIndex
+df.columns = [c[0] for c in df.columns]
 df = df.dropna()
 print(f"  {len(df)} daily bars ({df.index[0].date()} to {df.index[-1].date()})")
 
-# ─── Helper: detect 3-bar FVG ─────────────────────────────────────────────────
+# ─── MACD ─────────────────────────────────────────────────────────────────────
+fast = 12; slow = 26; sig = 9
+df["emaF"] = df["Close"].ewm(span=fast).mean()
+df["emaS"] = df["Close"].ewm(span=slow).mean()
+df["macd"] = df["emaF"] - df["emaS"]
+df["macdSig"] = df["macd"].ewm(span=sig).mean()
+df["macdHist"] = df["macd"] - df["macdSig"]
+
+# ─── MACD pivot detection (5 left/5 right, same as Pine script) ───────────────
+lbL, lbR = 5, 5
+def osc_pivots(osc):
+    pl = pd.Series(index=osc.index, dtype=float); pl[:] = np.nan
+    ph = pd.Series(index=osc.index, dtype=float); ph[:] = np.nan
+    v = osc.values
+    for i in range(lbL + lbR, len(v) - lbR):
+        if all(v[i] < v[i-j] for j in range(1, lbL+1)) and all(v[i] < v[i+j] for j in range(1, lbR+1)):
+            pl.iloc[i] = v[i]
+        if all(v[i] > v[i-j] for j in range(1, lbL+1)) and all(v[i] > v[i+j] for j in range(1, lbR+1)):
+            ph.iloc[i] = v[i]
+    return pl, ph
+
+df["macdPl"], df["macdPh"] = osc_pivots(df["macd"])
+
+# ─── MACD Regular Divergences ─────────────────────────────────────────────────
+df["macdBull"] = False; df["macdBear"] = False
+
+for i in range(lbR, len(df)):
+    # --- Bullish: price lower low, MACD higher low, both < 0 ---
+    if not np.isnan(df["macdPl"].iloc[i]):
+        prev_idx = None
+        for j in range(i-1, max(0, i-60), -1):
+            if not np.isnan(df["macdPl"].iloc[j]):
+                prev_idx = j; break
+        if prev_idx is not None and (i - prev_idx) <= 60:
+            price_ll = df["Low"].iloc[i] < df["Low"].iloc[prev_idx]
+            macd_hl = df["macd"].iloc[i] > df["macd"].iloc[prev_idx]
+            below_zero = df["macd"].iloc[i] < 0
+            if price_ll and macd_hl and below_zero:
+                df.loc[df.index[i], "macdBull"] = True
+
+    # --- Bearish: price higher high, MACD lower high, both > 0 ---
+    if not np.isnan(df["macdPh"].iloc[i]):
+        prev_idx = None
+        for j in range(i-1, max(0, i-60), -1):
+            if not np.isnan(df["macdPh"].iloc[j]):
+                prev_idx = j; break
+        if prev_idx is not None and (i - prev_idx) <= 60:
+            price_hh = df["High"].iloc[i] > df["High"].iloc[prev_idx]
+            macd_lh = df["macd"].iloc[i] < df["macd"].iloc[prev_idx]
+            above_zero = df["macd"].iloc[i] > 0
+            if price_hh and macd_lh and above_zero:
+                df.loc[df.index[i], "macdBear"] = True
+
+print(f"  MACD Bull divs: {df['macdBull'].sum()}, Bear divs: {df['macdBear'].sum()}")
+
+# ─── 3-bar FVG ────────────────────────────────────────────────────────────────
 def detect_fvg(h, l):
-    bull = pd.Series(index=h.index, dtype=float)
-    bear = pd.Series(index=h.index, dtype=float)
-    bull[:] = np.nan; bear[:] = np.nan
+    bull = pd.Series(index=h.index, dtype=float); bull[:] = np.nan
+    bear = pd.Series(index=h.index, dtype=float); bear[:] = np.nan
     lo = l.values; hi = h.values
     for i in range(2, len(lo)):
         if lo[i] > hi[i-2]:
-            bull.iloc[i] = lo[i]       # top of gap
-            bear.iloc[i] = hi[i-2]     # bottom of gap  (reusing bear series for bottom)
+            bull.iloc[i] = lo[i]; bear.iloc[i] = hi[i-2]
         elif hi[i] < lo[i-2]:
-            bear.iloc[i] = lo[i-2]     # top of gap
-            bull.iloc[i] = hi[i]       # bottom of gap  (reusing bull series for bottom)
+            bear.iloc[i] = lo[i-2]; bull.iloc[i] = hi[i]
     return bull, bear
 
 df["fvgTop"], df["fvgBot"] = detect_fvg(df["High"], df["Low"])
 df["fvgBull"] = df["fvgTop"].notna() & (df["fvgTop"] > df["fvgBot"])
 df["fvgBear"] = df["fvgTop"].notna() & (df["fvgTop"] < df["fvgBot"])
 
-# ─── Pivot detection (2 left + 2 right) ───────────────────────────────────────
+# ─── Pivot & DOL ──────────────────────────────────────────────────────────────
 def find_pivots(h, l):
     ph = pd.Series(index=h.index, dtype=float); ph[:] = np.nan
     pl = pd.Series(index=l.index, dtype=float); pl[:] = np.nan
     hi = h.values; lo = l.values
-    for i in range(2, len(hi) - 2):
-        if hi[i] > hi[i-1] and hi[i] > hi[i-2] and hi[i] > hi[i+1] and hi[i] > hi[i+2]:
+    for i in range(2, len(hi)-2):
+        if all(hi[i] > hi[i+j] for j in (-2,-1,1,2)):
             ph.iloc[i] = hi[i]
-        if lo[i] < lo[i-1] and lo[i] < lo[i-2] and lo[i] < lo[i+1] and lo[i] < lo[i+2]:
+        if all(lo[i] < lo[i+j] for j in (-2,-1,1,2)):
             pl.iloc[i] = lo[i]
     return ph, pl
 
 df["ph"], df["pl"] = find_pivots(df["High"], df["Low"])
 
-# ─── DOL (alternating pivots with min swing) ──────────────────────────────────
-dol_min = 0.001   # ~10 pips on AUDUSD
-last_hi = None; last_lo = None; dol_last = ""
-df["dolHi"] = np.nan; df["dolLo"] = np.nan
-
+dol_min = 0.001
+last_hi=None; last_lo=None; dol_last=""
+df["dolHi"]=np.nan; df["dolLo"]=np.nan
 for i in range(len(df)):
-    ph = df["ph"].iloc[i]; pl = df["pl"].iloc[i]
-    if not np.isnan(ph) and (dol_last == "" or dol_last == "low") and (last_lo is None or ph - last_lo >= dol_min):
-        df.loc[df.index[i], "dolHi"] = ph
-        last_hi = ph; dol_last = "high"
-    if not np.isnan(pl) and (dol_last == "" or dol_last == "high") and (last_hi is None or last_hi - pl >= dol_min):
-        df.loc[df.index[i], "dolLo"] = pl
-        last_lo = pl; dol_last = "low"
-
-# ─── S/R pivots (3,3) ─────────────────────────────────────────────────────────
-def sr_pivots(h, l):
-    sr_h = pd.Series(index=h.index, dtype=float); sr_h[:] = np.nan
-    sr_l = pd.Series(index=l.index, dtype=float); sr_l[:] = np.nan
-    hi = h.values; lo = l.values
-    for i in range(3, len(hi) - 3):
-        if all(hi[i] > hi[i-j] for j in range(1,4)) and all(hi[i] > hi[i+j] for j in range(1,4)):
-            sr_h.iloc[i] = hi[i]
-        if all(lo[i] < lo[i-j] for j in range(1,4)) and all(lo[i] < lo[i+j] for j in range(1,4)):
-            sr_l.iloc[i] = lo[i]
-    return sr_h, sr_l
-
-df["srHi"], df["srLo"] = sr_pivots(df["High"], df["Low"])
+    ph=df["ph"].iloc[i]; pl=df["pl"].iloc[i]
+    if not np.isnan(ph) and (dol_last=="" or dol_last=="low") and (last_lo is None or ph-last_lo>=dol_min):
+        df.loc[df.index[i],"dolHi"]=ph; last_hi=ph; dol_last="high"
+    if not np.isnan(pl) and (dol_last=="" or dol_last=="high") and (last_hi is None or last_hi-pl>=dol_min):
+        df.loc[df.index[i],"dolLo"]=pl; last_lo=pl; dol_last="low"
 
 # ─── Sweep detection ──────────────────────────────────────────────────────────
-def detect_sweeps(df, lookback=10):
-    sweep_bull = pd.Series(index=df.index, dtype=bool); sweep_bull[:] = False
-    sweep_bear = pd.Series(index=df.index, dtype=bool); sweep_bear[:] = False
-    for i in range(lookback + 1, len(df)):
-        window = df.iloc[i - lookback : i]
-        hi_level = window["High"].max()
-        lo_level = window["Low"].min()
-        close = df["Close"].iloc[i]
-        high = df["High"].iloc[i]
-        low = df["Low"].iloc[i]
-        # Bearish sweep: breaks above recent high, closes below
-        if high > hi_level and close < hi_level:
-            sweep_bear.iloc[i] = True
-        # Bullish sweep: breaks below recent low, closes above
-        if low < lo_level and close > lo_level:
-            sweep_bull.iloc[i] = True
-    return sweep_bull, sweep_bear
+def detect_sweeps(df, lb=10):
+    sb=pd.Series(index=df.index,dtype=bool); sb[:]=False
+    sr=pd.Series(index=df.index,dtype=bool); sr[:]=False
+    for i in range(lb+1, len(df)):
+        w=df.iloc[i-lb:i]; hh=w["High"].max(); ll=w["Low"].min()
+        if df["High"].iloc[i]>hh and df["Close"].iloc[i]<hh: sr.iloc[i]=True
+        if df["Low"].iloc[i]<ll and df["Close"].iloc[i]>ll: sb.iloc[i]=True
+    return sb, sr
 
-df["sweepBul"], df["sweepBer"] = detect_sweeps(df, lookback=10)
+df["sBul"], df["sBer"] = detect_sweeps(df)
 
 # ─── Entry signals ────────────────────────────────────────────────────────────
-# Bullish: bullish sweep + near a bullish FVG (within 10 periods)
-# Bearish: bearish sweep + near a bearish FVG (within 10 periods)
-df["entryLong"] = False; df["entryShort"] = False
-fvg_lookback = 10
+fvg_lb = 10
+df["entryLong"]=False; df["entryShort"]=False
+df["entryStrongL"]=False; df["entryStrongS"]=False
 
 for i in range(1, len(df)):
-    start = max(0, i - fvg_lookback)
-    near_bull_fvg = df["fvgBull"].iloc[start:i+1].any()
-    near_bear_fvg = df["fvgBear"].iloc[start:i+1].any()
-    if df["sweepBul"].iloc[i] and near_bull_fvg:
+    s = max(0, i-fvg_lb)
+    nearB = df["fvgBull"].iloc[s:i+1].any()
+    nearR = df["fvgBear"].iloc[s:i+1].any()
+    if df["sBul"].iloc[i] and nearB:
         df.loc[df.index[i], "entryLong"] = True
-    if df["sweepBer"].iloc[i] and near_bear_fvg:
+        if df["macdBull"].iloc[i]: df.loc[df.index[i], "entryStrongL"] = True
+    if df["sBer"].iloc[i] and nearR:
         df.loc[df.index[i], "entryShort"] = True
+        if df["macdBear"].iloc[i]: df.loc[df.index[i], "entryStrongS"] = True
 
 # ─── Backtest ─────────────────────────────────────────────────────────────────
 trades = []
-in_trade = 0
-entry_price = 0; entry_idx = 0; entry_dir = ""
-tp_pts = 0.006  # ~60 pips
-sl_pts = 0.003  # ~30 pips
-equity = [10000]
-bars = df.index
+in_trade=0; entry_p=0; entry_i=0; entry_d=""
+tp_pts=0.006; sl_pts=0.003
+equity=[10000]; bars=df.index
 
 for i in range(1, len(df)):
-    if in_trade == 0:
-        if df["entryLong"].iloc[i]:
-            in_trade = 1
-            entry_price = df["Close"].iloc[i]
-            entry_idx = i
-            entry_dir = "long"
-        elif df["entryShort"].iloc[i]:
-            in_trade = -1
-            entry_price = df["Close"].iloc[i]
-            entry_idx = i
-            entry_dir = "short"
+    if in_trade==0:
+        if df["entryStrongL"].iloc[i] or df["entryLong"].iloc[i]:
+            in_trade=1; entry_p=df["Close"].iloc[i]; entry_i=i; entry_d="long"
+        elif df["entryStrongS"].iloc[i] or df["entryShort"].iloc[i]:
+            in_trade=-1; entry_p=df["Close"].iloc[i]; entry_i=i; entry_d="short"
     else:
-        high = df["High"].iloc[i]
-        low = df["Low"].iloc[i]
-        close = df["Close"].iloc[i]
-        hit_tp = False; hit_sl = False
-        if in_trade == 1:   # long
-            tp = entry_price + tp_pts
-            sl = entry_price - sl_pts
-            if high >= tp: hit_tp = True
-            if low <= sl: hit_sl = True
-        else:               # short
-            tp = entry_price - tp_pts
-            sl = entry_price + sl_pts
-            if low <= tp: hit_tp = True
-            if high >= sl: hit_sl = True
+        hi=df["High"].iloc[i]; lo=df["Low"].iloc[i]; cl=df["Close"].iloc[i]
+        ht=False; hs=False
+        if in_trade==1:
+            tp=entry_p+tp_pts; sl=entry_p-sl_pts
+            if hi>=tp: ht=True
+            if lo<=sl: hs=True
+        else:
+            tp=entry_p-tp_pts; sl=entry_p+sl_pts
+            if lo<=tp: ht=True
+            if hi>=sl: hs=True
+        reason=None; xp=0
+        if ht: reason="TP"; xp=tp
+        elif hs: reason="SL"; xp=sl
+        elif i-entry_i>=20: reason="timeout"; xp=cl
+        if reason:
+            ret = (xp/entry_p-1)*(1 if in_trade==1 else -1)*100
+            trades.append({"entry_date":bars[entry_i],"exit_date":bars[i],
+                           "dir":entry_d,"entry":entry_p,"exit":xp,
+                           "ret":ret,"reason":reason, "strong":"strong" in entry_d})
+            equity.append(equity[-1]*(1+ret/100))
+            in_trade=0
 
-        exit_reason = None
-        if hit_tp:
-            exit_price = tp
-            exit_reason = "TP"
-        elif hit_sl:
-            exit_price = sl
-            exit_reason = "SL"
-        elif i - entry_idx >= 20:   # max 20 bars
-            exit_price = close
-            exit_reason = "timeout"
-
-        if exit_reason:
-            ret = (exit_price / entry_price - 1) * (1 if in_trade == 1 else -1) * 100
-            trades.append({
-                "entry_date": bars[entry_idx], "exit_date": bars[i],
-                "dir": entry_dir, "entry": entry_price, "exit": exit_price,
-                "ret": ret, "reason": exit_reason
-            })
-            equity.append(equity[-1] * (1 + ret / 100))
-            in_trade = 0
-            entry_price = 0
-
-# ─── Print results ────────────────────────────────────────────────────────────
-win = [t for t in trades if t["ret"] > 0]
-loss = [t for t in trades if t["ret"] <= 0]
+# ─── Results ──────────────────────────────────────────────────────────────────
+win=[t for t in trades if t["ret"]>0]
+los=[t for t in trades if t["ret"]<=0]
+strong=[t for t in trades if t.get("strong")]
 print(f"\n--- Backtest Results ---")
-print(f"Trades: {len(trades)}")
-print(f"Win rate: {len(win)/len(trades)*100:.1f}%" if trades else "N/A")
-if win:
+print(f"Trades: {len(trades)} (strong: {len(strong)})")
+print(f"Win rate: {len(win)/len(trades)*100:.1f}%")
+if win and los:
     print(f"Avg win: {np.mean([t['ret'] for t in win]):.2f}%")
-if loss:
-    print(f"Avg loss: {np.mean([t['ret'] for t in loss]):.2f}%")
+    print(f"Avg loss: {np.mean([t['ret'] for t in los]):.2f}%")
+if strong:
+    sw=[t for t in strong if t["ret"]>0]
+    print(f"Strong trades: {len(strong)}, win: {len(sw)/len(strong)*100:.1f}%")
 if trades:
     print(f"Total return: {(equity[-1]/equity[0]-1)*100:.1f}%")
     print(f"Final equity: ${equity[-1]:.0f}")
+    print(f"Max drawdown: {(equity[0]-min(equity))/equity[0]*100:.1f}%")
 
-# ─── Plot ──────────────────────────────────────────────────────────────────────
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 10), gridspec_kw={"height_ratios": [3, 1]})
-fig.suptitle("ManipulationX V.6 — AUDUSD Backtest", fontsize=15, fontweight="bold")
+# ─── Plot ─────────────────────────────────────────────────────────────────────
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(16, 12),
+    gridspec_kw={"height_ratios": [3, 0.8, 1]})
+fig.suptitle("ManipulationX V.6 + MACD Divergences — AUDUSD Backtest", fontsize=14, fontweight="bold")
 
-# Price + indicator elements
-ax1.plot(df.index, df["Close"], color="#1a1a2e", linewidth=0.8, label="AUDUSD", zorder=2)
-
-# FVG zones
+# Price panel
+ax1.plot(df.index, df["Close"], color="#1a1a2e", lw=0.8, label="AUDUSD", zorder=2)
 for i in range(len(df)):
     if df["fvgBull"].iloc[i]:
         ax1.axhspan(df["fvgBot"].iloc[i], df["fvgTop"].iloc[i],
-                     xmin=i/len(df), xmax=(i+5)/len(df),
-                     alpha=0.15, color="#00ff88", zorder=1)
+            xmin=i/len(df), xmax=(i+5)/len(df), alpha=0.12, color="#00ff88", zorder=1)
     elif df["fvgBear"].iloc[i]:
         ax1.axhspan(df["fvgBot"].iloc[i], df["fvgTop"].iloc[i],
-                     xmin=i/len(df), xmax=(i+5)/len(df),
-                     alpha=0.15, color="#ff4444", zorder=1)
+            xmin=i/len(df), xmax=(i+5)/len(df), alpha=0.12, color="#ff4444", zorder=1)
 
-# Pivot markers (DOL)
-dol_idx = df.index[df["dolHi"].notna()]
-ax1.scatter(dol_idx, df.loc[dol_idx, "dolHi"], marker="v", s=40,
-            color="#9C27B0", edgecolors="white", linewidths=0.5, zorder=5, label="DOL High")
-dol_idx = df.index[df["dolLo"].notna()]
-ax1.scatter(dol_idx, df.loc[dol_idx, "dolLo"], marker="^", s=40,
-            color="#9C27B0", edgecolors="white", linewidths=0.5, zorder=5, label="DOL Low")
+dix=df.index[df["dolHi"].notna()]
+ax1.scatter(dix, df.loc[dix,"dolHi"], marker="v", s=35, color="#9C27B0", ec="white", lw=0.3, zorder=5)
+dix=df.index[df["dolLo"].notna()]
+ax1.scatter(dix, df.loc[dix,"dolLo"], marker="^", s=35, color="#9C27B0", ec="white", lw=0.3, zorder=5)
 
-# S/R lines
-for i in range(len(df)):
-    if not np.isnan(df["srHi"].iloc[i]):
-        ax1.axhline(y=df["srHi"].iloc[i], color="#FFD600", alpha=0.15, linewidth=0.8)
-    if not np.isnan(df["srLo"].iloc[i]):
-        ax1.axhline(y=df["srLo"].iloc[i], color="#FFD600", alpha=0.15, linewidth=0.8)
+ax1.scatter(df.index[df["macdBull"]], df.loc[df["macdBull"],"Low"]-0.002,
+            marker=6, s=40, color="#00E676", zorder=6)
+ax1.scatter(df.index[df["macdBear"]], df.loc[df["macdBear"],"High"]+0.002,
+            marker=7, s=40, color="#FF5252", zorder=6)
 
-# Sweep labels
-swp_b = df.index[df["sweepBul"]]
-swp_s = df.index[df["sweepBer"]]
-ax1.scatter(swp_b, df.loc[swp_b, "Low"] - 0.001, marker=6, s=30, color="#69F0AE", zorder=6)
-ax1.scatter(swp_s, df.loc[swp_s, "High"] + 0.001, marker=7, s=30, color="#FF5252", zorder=6)
-for idx in swp_b[:5]:
-    ax1.annotate(" SWEEP", (idx, df.loc[idx, "Low"] - 0.001), fontsize=6, color="#69F0AE")
-for idx in swp_s[:5]:
-    ax1.annotate(" SWEEP", (idx, df.loc[idx, "High"] + 0.002), fontsize=6, color="#FF5252")
-
-# Trade markers
 for t in trades:
-    color = "#00E676" if t["ret"] > 0 else "#FF1744"
-    marker = "^" if t["dir"] == "long" else "v"
-    ax1.scatter(t["entry_date"], t["entry"], marker=marker, s=80,
-                color=color, edgecolors="white", linewidths=1, zorder=10)
-    ax1.scatter(t["exit_date"], t["exit"], marker="x", s=60,
-                color=color, linewidths=1, zorder=10)
+    c = "#00E676" if t["ret"]>0 else "#FF1744"
+    mk = "^" if t["dir"]=="long" else "v"
+    ax1.scatter(t["entry_date"], t["entry"], marker=mk, s=70, color=c, ec="white", lw=0.8, zorder=10)
+    ax1.scatter(t["exit_date"], t["exit"], marker="x", s=50, color=c, lw=0.8, zorder=10)
     ax1.plot([t["entry_date"], t["exit_date"]], [t["entry"], t["exit"]],
-             color=color, linewidth=0.6, linestyle="--", zorder=9)
+             color=c, lw=0.5, ls="--", zorder=9)
 
-ax1.set_ylabel("Price")
-ax1.legend(loc="upper left", fontsize=7, ncol=2)
-ax1.grid(alpha=0.2)
+ax1.set_ylabel("Price"); ax1.legend(loc="upper left", fontsize=7); ax1.grid(alpha=0.2)
 
-# Equity curve
-dates = df.index
-eq_series = pd.Series(index=dates[:len(equity)], data=equity)
-ax2.plot(eq_series.index, eq_series.values, color="#1a237e", linewidth=1)
-ax2.fill_between(eq_series.index, 10000, eq_series.values, alpha=0.1, color="#1a237e")
-ax2.set_ylabel("Equity ($)")
-ax2.set_xlabel("Date")
-ax2.grid(alpha=0.2)
+# MACD panel
+ax2.axhline(0, color="#666", lw=0.5)
+ax2.plot(df.index, df["macd"], color="#2962FF", lw=1, label="MACD")
+ax2.plot(df.index, df["macdSig"], color="#FF6D00", lw=0.7, label="Signal")
+ax2.bar(df.index, df["macdHist"], width=1, color=np.where(df["macdHist"]>=0, "#26A69A", "#FF5252"), alpha=0.6)
+ax2.scatter(df.index[df["macdBull"]], df.loc[df["macdBull"],"macd"], marker="^", s=60,
+            color="#00E676", ec="white", zorder=5, label="Bull div")
+ax2.scatter(df.index[df["macdBear"]], df.loc[df["macdBear"],"macd"], marker="v", s=60,
+            color="#FF5252", ec="white", zorder=5, label="Bear div")
+ax2.set_ylabel("MACD"); ax2.legend(loc="upper left", fontsize=7); ax2.grid(alpha=0.2)
+
+# Equity
+dates=df.index
+eq=pd.Series(index=dates[:len(equity)], data=equity)
+ax3.plot(eq.index, eq.values, color="#1a237e", lw=1)
+ax3.fill_between(eq.index, 10000, eq.values, alpha=0.1, color="#1a237e")
+ax3.axhline(10000, color="#666", lw=0.5, ls="--")
+ax3.set_ylabel("Equity ($)"); ax3.set_xlabel("Date"); ax3.grid(alpha=0.2)
 
 plt.tight_layout()
 plt.savefig("D:\\Descargas\\smt_divergence\\backtest_chart.png", dpi=150)
 print(f"\nChart saved: backtest_chart.png")
-# plt.show()  # uncomment to display interactively
 print("Done.")
