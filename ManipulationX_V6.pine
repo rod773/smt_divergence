@@ -1,17 +1,19 @@
 //@version=5
-indicator("ManipulationX V.6", overlay=true, max_lines_count=0, max_labels_count=300, max_boxes_count=500)
+indicator("ManipulationX V.6", overlay=true, max_lines_count=200, max_labels_count=200, max_boxes_count=150)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15   = input.bool(true,  "Show 15m FVG")
 showFvg1h   = input.bool(true,  "Show 1h FVG")
 showFvg4h   = input.bool(false, "Show 4h FVG")
-fvgMinTicks = input.int(4, "Min FVG Gap (ticks)", minval=1, maxval=50)
+fvgMinTicks = input.int(8, "Min FVG Gap (ticks)", minval=1, maxval=50)
+fvgNyOnly   = input.bool(true,  "FVG only during NY session")
 showIFVG    = input.bool(true,  "Show iFVGs")
 showSmt     = input.bool(true,  "Show SMT Divergence")
 smtSymbol   = input.symbol("ES1!", "SMT Symbol")
 showDol     = input.bool(true,  "Show DOL Levels")
 showSr      = input.bool(true,  "Show S/R Levels")
-srMinTicks  = input.int(8, "Min S/R Swing (ticks)", minval=2, maxval=100)
+srMinTicks  = input.int(12, "Min S/R Swing (ticks)", minval=2, maxval=100)
+srNyOnly    = input.bool(true,  "S/R only during NY session")
 showKz      = input.bool(true,  "Use Killzones")
 
 cFvgBull = input.color(color.new(#00ff88, 50), "Bullish FVG")
@@ -35,7 +37,9 @@ lonSess = time(timeframe.period, "0300-1200", "America/New_York")
 lonKz = showKz and not na(lonSess)
 bgcolor(lonKz ? cKzLon : na)
 
-// ─── HTF FVG (box tool style) ───────────────────────────────────────────────
+inNy = not na(nySess)
+
+// ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
 fvgData(tf) =>
     [h, l, h2, l2, t] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2], time])
     bull = l > h2
@@ -49,21 +53,22 @@ fvgData(tf) =>
 
 drawFvgBox(yHi, yLo, c, lbl) =>
     if math.abs(yHi - yLo) >= fvgMinTicks * syminfo.mintick
-        box.new(bar_index, yHi, bar_index + 50, yLo, border_color=c, bgcolor=color.new(c, 80))
+        box.new(bar_index, yHi, bar_index + 40, yLo, border_color=c, bgcolor=color.new(c, 80))
         label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
          style=label.style_label_center, textcolor=color.white, size=size.tiny)
 
-if showFvg15 and d15b[1] and n15
+nyOk = not fvgNyOnly or inNy
+if showFvg15 and nyOk and d15b[1] and n15
     drawFvgBox(l15[1], h215[1], cFvgBull, "15M")
-if showFvg15 and d15r[1] and n15
+if showFvg15 and nyOk and d15r[1] and n15
     drawFvgBox(l215[1], h15[1], cFvgBear, "15M")
-if showFvg1h and d1hb[1] and n1h
+if showFvg1h and nyOk and d1hb[1] and n1h
     drawFvgBox(l1h[1], h21h[1], cFvgBull, "1H")
-if showFvg1h and d1hr[1] and n1h
+if showFvg1h and nyOk and d1hr[1] and n1h
     drawFvgBox(l21h[1], h1h[1], cFvgBear, "1H")
-if showFvg4h and d4hb[1] and n4h
+if showFvg4h and nyOk and d4hb[1] and n4h
     drawFvgBox(l4h[1], h24h[1], cFvgBull, "4H")
-if showFvg4h and d4hr[1] and n4h
+if showFvg4h and nyOk and d4hr[1] and n4h
     drawFvgBox(l24h[1], h4h[1], cFvgBear, "4H")
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
@@ -81,41 +86,53 @@ if showIFVG and sIFVG
     label.new(bar_index, high, " IFVG", color=color.new(#FF1744, 20),
      style=label.style_label_down, textcolor=color.white, size=size.tiny)
 
-// ─── SMT Divergence ──────────────────────────────────────────────────────────
+// ─── SMT Divergence (with pivot connection lines) ────────────────────────────
 nqPl = ta.pivotlow(low, 2, 2)
 nqPh = ta.pivothigh(high, 2, 2)
 esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
 esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
 
 var float pNqLo = na
-var float pEsLo = na
+var int pNqLoBar = na
 var float pNqHi = na
+var int pNqHiBar = na
+var float pEsLo = na
+var int pEsLoBar = na
 var float pEsHi = na
+var int pEsHiBar = na
 bSMT = false
 sSMT = false
 
+if not na(esPl)
+    pEsLo := esPl
+    pEsLoBar := bar_index
+if not na(esPh)
+    pEsHi := esPh
+    pEsHiBar := bar_index
+
 if not na(nqPl)
     eLo = ta.valuewhen(not na(esPl), esPl, 0)
+    eLoBar = ta.valuewhen(not na(esPl), bar_index, 0)
     if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
         bSMT := true
+        if showSmt
+            line.new(pNqLoBar, pNqLo, bar_index, nqPl, color=cSmtBull, width=2)
+            line.new(pEsLoBar, pEsLo, eLoBar, eLo, color=cSmtBear, width=2)
+            label.new(bar_index, low, " SMT", color=cSmtBull,
+             style=label.style_label_up, textcolor=color.white, size=size.small)
     pNqLo := nqPl
-    if not na(eLo)
-        pEsLo := eLo
+    pNqLoBar := bar_index
 
 if not na(nqPh)
     eHi = ta.valuewhen(not na(esPh), esPh, 0)
+    eHiBar = ta.valuewhen(not na(esPh), bar_index, 0)
     if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
         sSMT := true
-    pNqHi := nqPh
-    if not na(eHi)
-        pEsHi := eHi
-
-if showSmt and bSMT
-    label.new(bar_index, low, " SMT", color=cSmtBull,
-     style=label.style_label_up, textcolor=color.white, size=size.small)
-if showSmt and sSMT
-    label.new(bar_index, high, " SMT", color=cSmtBear,
-     style=label.style_label_down, textcolor=color.white, size=size.small)
+        if showSmt
+            line.new(pNqHiBar, pNqHi, bar_index, nqPh, color=cSmtBear, width=2)
+            line.new(pEsHiBar, pEsHi, eHiBar, eHi, color=cSmtBull, width=2)
+            label.new(bar_index, high, " SMT", color=cSmtBear,
+             style=label.style_label_down, textcolor=color.white, size=size.small)
 
 // ─── DOL Levels ──────────────────────────────────────────────────────────────
 if showDol
@@ -126,16 +143,16 @@ if showDol
         label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
-// ─── S/R Levels (thin boxes at pivots, filtered by swing size) ───────────────
-if showSr
+// ─── S/R Levels (thin boxes, filtered) ───────────────────────────────────────
+if showSr and (not srNyOnly or inNy)
     srHi = ta.pivothigh(high, 3, 3)
     srLo = ta.pivotlow(low, 3, 3)
     srMin = srMinTicks * syminfo.mintick
     if not na(srHi) and (srHi - ta.lowest(low, 3)[1]) >= srMin
-        box.new(bar_index, srHi, bar_index + 50, srHi - syminfo.mintick * 2,
+        box.new(bar_index, srHi, bar_index + 40, srHi - syminfo.mintick * 2,
          border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
     if not na(srLo) and (ta.highest(high, 3)[1] - srLo) >= srMin
-        box.new(bar_index, srLo + syminfo.mintick * 2, bar_index + 50, srLo,
+        box.new(bar_index, srLo + syminfo.mintick * 2, bar_index + 40, srLo,
          border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
