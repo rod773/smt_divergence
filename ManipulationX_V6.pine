@@ -5,11 +5,13 @@ indicator("ManipulationX V.6", overlay=true, max_lines_count=0, max_labels_count
 showFvg15   = input.bool(true,  "Show 15m FVG")
 showFvg1h   = input.bool(true,  "Show 1h FVG")
 showFvg4h   = input.bool(false, "Show 4h FVG")
+fvgMinTicks = input.int(4, "Min FVG Gap (ticks)", minval=1, maxval=50)
 showIFVG    = input.bool(true,  "Show iFVGs")
 showSmt     = input.bool(true,  "Show SMT Divergence")
 smtSymbol   = input.symbol("ES1!", "SMT Symbol")
 showDol     = input.bool(true,  "Show DOL Levels")
 showSr      = input.bool(true,  "Show S/R Levels")
+srMinTicks  = input.int(8, "Min S/R Swing (ticks)", minval=2, maxval=100)
 showKz      = input.bool(true,  "Use Killzones")
 
 cFvgBull = input.color(color.new(#00ff88, 50), "Bullish FVG")
@@ -46,9 +48,10 @@ fvgData(tf) =>
 [d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData("240")
 
 drawFvgBox(yHi, yLo, c, lbl) =>
-    box.new(bar_index, yHi, bar_index + 50, yLo, border_color=c, bgcolor=color.new(c, 80))
-    label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
-     style=label.style_label_center, textcolor=color.white, size=size.tiny)
+    if math.abs(yHi - yLo) >= fvgMinTicks * syminfo.mintick
+        box.new(bar_index, yHi, bar_index + 50, yLo, border_color=c, bgcolor=color.new(c, 80))
+        label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
+         style=label.style_label_center, textcolor=color.white, size=size.tiny)
 
 if showFvg15 and d15b[1] and n15
     drawFvgBox(l15[1], h215[1], cFvgBull, "15M")
@@ -123,14 +126,15 @@ if showDol
         label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
-// ─── S/R Levels (thin boxes at pivots) ───────────────────────────────────────
+// ─── S/R Levels (thin boxes at pivots, filtered by swing size) ───────────────
 if showSr
     srHi = ta.pivothigh(high, 3, 3)
     srLo = ta.pivotlow(low, 3, 3)
-    if not na(srHi)
+    srMin = srMinTicks * syminfo.mintick
+    if not na(srHi) and (srHi - ta.lowest(low, 3)[1]) >= srMin
         box.new(bar_index, srHi, bar_index + 50, srHi - syminfo.mintick * 2,
          border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
-    if not na(srLo)
+    if not na(srLo) and (ta.highest(high, 3)[1] - srLo) >= srMin
         box.new(bar_index, srLo + syminfo.mintick * 2, bar_index + 50, srLo,
          border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
 
