@@ -23,7 +23,7 @@ sydSess = input.session('0500-1300', 'Sydney session')
 sydColor = input.color(color.rgb(255, 69, 0), 'Sydney color')
 lonSess = input.session('1400-2300', 'London session')
 lonColor = input.color(color.blue, 'London color')
-nySess = input.session('2000-0400', 'New York session')
+nySess = input.session('1500-2200', 'New York session')
 nyColor = input.color(color.purple, 'New York color')
 sessTransp = input.int(85, 'Session box transparency')
 sessLineStyle = input.string('solid', 'Session line style', options = ['solid', 'dashed', 'dotted'])
@@ -380,7 +380,7 @@ if showDol and (not dolNyOnly or inNy)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    lbl = '1. NY session (15:30 Madrid)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
+    lbl = '1. NY session (15:00 Madrid)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
     label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
