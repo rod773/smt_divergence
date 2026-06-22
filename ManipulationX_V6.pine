@@ -1,5 +1,5 @@
 //@version=6
-indicator('ManipulationX V.6', overlay = true, max_lines_count = 300, max_labels_count = 300, max_boxes_count = 150)
+indicator('ManipulationX V.6', overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 200)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15 = input.bool(true, 'Show 15m FVG')
@@ -16,6 +16,18 @@ showDol = input.bool(true, 'Show DOL Levels')
 dolMinTicks = input.int(16, 'Min DOL Swing (ticks)', minval = 4, maxval = 200)
 dolNyOnly = input.bool(true, 'DOL only during NY session')
 showKz = input.bool(true, 'Use Killzones')
+showSessions = input.bool(true, 'Show Session Boxes')
+asiaSess = input.session('0100-0900', 'Asia session')
+asiaColor = input.color(color.yellow, 'Asia color')
+sydSess = input.session('2300-0700', 'Sydney session')
+sydColor = input.color(color.rgb(255, 69, 0), 'Sydney color')
+lonSess = input.session('0800-1700', 'London session')
+lonColor = input.color(color.blue, 'London color')
+nySess = input.session('1400-2200', 'New York session')
+nyColor = input.color(color.purple, 'New York color')
+sessTransp = input.int(85, 'Session box transparency')
+sessLineStyle = input.string('solid', 'Session line style', options = ['solid', 'dashed', 'dotted'])
+sessTz = input.string('America/New_York', 'Session timezone', options = ['America/New_York', 'Europe/London', 'Europe/Madrid', 'Asia/Tokyo'])
 
 cFvgBull = input.color(color.new(#00ff88, 50), 'Bullish FVG')
 cFvgBear = input.color(color.new(#ff4444, 50), 'Bearish FVG')
@@ -31,16 +43,16 @@ bool nyKz = false
 bool lonKz = false
 
 if showKz
-    nySess = time(timeframe.period, '0930-1600', 'America/New_York')
-    nyKz := not na(nySess)
-    nyStart = na(nySess[1]) and not na(nySess)
+    nyKzSess = time(timeframe.period, '0930-1600', 'America/New_York')
+    nyKz := not na(nyKzSess)
+    nyStart = na(nyKzSess[1]) and not na(nyKzSess)
     if nyStart
         label.new(bar_index, high, ' NY Open ', color = cKzNy, style = label.style_label_lower_left, textcolor = color.white, size = size.small)
     
-    lonSess = time(timeframe.period, '0300-1200', 'America/New_York')
-    lonKz := not na(lonSess)
+    lonKzSess = time(timeframe.period, '0300-1200', 'America/New_York')
+    lonKz := not na(lonKzSess)
     
-    inNy := not na(nySess)
+    inNy := not na(nyKzSess)
 else
     inNy := false
     nyKz := false
@@ -48,6 +60,100 @@ else
 
 bgcolor(nyKz ? cKzNy : na)
 bgcolor(lonKz ? cKzLon : na)
+
+// ─── Session Boxes (from sessions1.pine) ──────────────────────────────────────
+bool showSessBoxes = timeframe.in_seconds() < 14400
+
+styleFromStr(str) =>
+    str == 'dashed' ? line.style_dashed : str == 'dotted' ? line.style_dotted : line.style_solid
+int sessLine = styleFromStr(sessLineStyle)
+
+inSession(sess) =>
+    not na(time(timeframe.period, sess + ':1234567', sessTz))
+
+entered(cond) =>
+    cond and not cond[1]
+
+exited(cond) =>
+    not cond and cond[1]
+
+asiaIn = inSession(asiaSess)
+sydIn = inSession(sydSess)
+londonIn = inSession(lonSess)
+nySessIn = inSession(nySess)
+
+var float asiaH = na
+var float asiaL = na
+var int asiaStart = na
+var box asiaBox = na
+
+var float sydH = na
+var float sydL = na
+var int sydStart = na
+var box sydBox = na
+
+var float lonH = na
+var float lonL = na
+var int lonStart = na
+var box lonBox = na
+
+var float nyH = na
+var float nyL = na
+var int nyStart = na
+var box nyBox = na
+
+if showSessions and showSessBoxes
+    if entered(asiaIn)
+        asiaH := high; asiaL := low; asiaStart := bar_index
+        asiaBox := box.new(asiaStart, asiaH, bar_index, asiaL, xloc = xloc.bar_index, border_color = asiaColor, bgcolor = color.new(asiaColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
+    if not na(asiaBox)
+        if asiaIn
+            asiaH := math.max(asiaH, high); asiaL := math.min(asiaL, low)
+            box.set_top(asiaBox, asiaH); box.set_bottom(asiaBox, asiaL); box.set_right(asiaBox, bar_index)
+        if exited(asiaIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = asiaColor, width = 1, style = sessLine)
+            label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
+            asiaH := na; asiaL := na; asiaStart := na; asiaBox := na
+
+    if entered(sydIn)
+        sydH := high; sydL := low; sydStart := bar_index
+        sydBox := box.new(sydStart, sydH, bar_index, sydL, xloc = xloc.bar_index, border_color = sydColor, bgcolor = color.new(sydColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
+    if not na(sydBox)
+        if sydIn
+            sydH := math.max(sydH, high); sydL := math.min(sydL, low)
+            box.set_top(sydBox, sydH); box.set_bottom(sydBox, sydL); box.set_right(sydBox, bar_index)
+        if exited(sydIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = sydColor, width = 1, style = sessLine)
+            label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
+            sydH := na; sydL := na; sydStart := na; sydBox := na
+
+    if entered(londonIn)
+        lonH := high; lonL := low; lonStart := bar_index
+        lonBox := box.new(lonStart, lonH, bar_index, lonL, xloc = xloc.bar_index, border_color = lonColor, bgcolor = color.new(lonColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
+    if not na(lonBox)
+        if londonIn
+            lonH := math.max(lonH, high); lonL := math.min(lonL, low)
+            box.set_top(lonBox, lonH); box.set_bottom(lonBox, lonL); box.set_right(lonBox, bar_index)
+        if exited(londonIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = lonColor, width = 1, style = sessLine)
+            label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
+            lonH := na; lonL := na; lonStart := na; lonBox := na
+
+    if entered(nySessIn)
+        nyH := high; nyL := low; nyStart := bar_index
+        nyBox := box.new(nyStart, nyH, bar_index, nyL, xloc = xloc.bar_index, border_color = nyColor, bgcolor = color.new(nyColor, sessTransp))
+        line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
+    if not na(nyBox)
+        if nySessIn
+            nyH := math.max(nyH, high); nyL := math.min(nyL, low)
+            box.set_top(nyBox, nyH); box.set_bottom(nyBox, nyL); box.set_right(nyBox, bar_index)
+        if exited(nySessIn)
+            line.new(bar_index, close, bar_index, close, xloc = xloc.bar_index, extend = extend.none, color = nyColor, width = 1, style = sessLine)
+            label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
+            nyH := na; nyL := na; nyStart := na; nyBox := na
 
 // ─── HTF FVG (box tool style, filtered) ──────────────────────────────────────
 fvgDraw(tf, cBull, cBear, lbl) =>
