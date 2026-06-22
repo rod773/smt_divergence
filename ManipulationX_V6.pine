@@ -318,53 +318,53 @@ if dNew
         dLoLine := line.new(bar_index[1], dLo, bar_index, dLo, color = color.new(#FFD600, 30), width = 1, extend = extend.right)
 
 // Sweeps: break level + close back inside
+barHiSweep = false
+barLoSweep = false
 dHiSweep = showSweep and dNew and not dHiHit and high > dHi + swp and close < dHi
 dLoSweep = showSweep and dNew and not dLoHit and low < dLo - swp and close > dLo
 if dHiSweep
-    label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+    barHiSweep := true
     dHiHit := true
 if dLoSweep
-    label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+    barLoSweep := true
     dLoHit := true
-asiaHiSweep := dHiSweep
-asiaLoSweep := dLoSweep
-lonHiSweep := false
-lonLoSweep := false
+asiaHiSweep := barHiSweep
+asiaLoSweep := barLoSweep
 
 // Session level sweeps (using finalized session hi/lo, one sweep per level)
 if showSweep
-    sessSweepHi = false
-    sessSweepLo = false
     if not asiaSweepHit and not na(asiaFinalHi) and high > asiaFinalHi + swp and close < asiaFinalHi
         asiaSweepHit := true
-        sessSweepHi := true
+        barHiSweep := true
     if not asiaSweepHit and not na(asiaFinalLo) and low < asiaFinalLo - swp and close > asiaFinalLo
         asiaSweepHit := true
-        sessSweepLo := true
+        barLoSweep := true
     if not sydSweepHit and not na(sydFinalHi) and high > sydFinalHi + swp and close < sydFinalHi
         sydSweepHit := true
-        sessSweepHi := true
+        barHiSweep := true
     if not sydSweepHit and not na(sydFinalLo) and low < sydFinalLo - swp and close > sydFinalLo
         sydSweepHit := true
-        sessSweepLo := true
+        barLoSweep := true
     if not lonSweepHit and not na(lonFinalHi) and high > lonFinalHi + swp and close < lonFinalHi
         lonSweepHit := true
-        sessSweepHi := true
+        barHiSweep := true
     if not lonSweepHit and not na(lonFinalLo) and low < lonFinalLo - swp and close > lonFinalLo
         lonSweepHit := true
-        sessSweepLo := true
+        barLoSweep := true
     if not nySweepHit and not na(nyFinalHi) and high > nyFinalHi + swp and close < nyFinalHi
         nySweepHit := true
-        sessSweepHi := true
+        barHiSweep := true
     if not nySweepHit and not na(nyFinalLo) and low < nyFinalLo - swp and close > nyFinalLo
         nySweepHit := true
-        sessSweepLo := true
-    if sessSweepHi
-        label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
-    if sessSweepLo
-        label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
-    asiaHiSweep := asiaHiSweep or sessSweepHi
-    asiaLoSweep := asiaLoSweep or sessSweepLo
+        barLoSweep := true
+
+// Draw at most one label per direction per bar
+if barHiSweep
+    label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
+if barLoSweep
+    label.new(bar_index, low, ' SWEEP', color = color.new(#69F0AE, 30), style = label.style_label_up, textcolor = color.white, size = size.tiny)
+asiaHiSweep := barHiSweep
+asiaLoSweep := barLoSweep
 
 // ─── DOL Levels (alternating highs/lows, filtered) ───────────────────────────
 if showDol and (not dolNyOnly or inNy)
