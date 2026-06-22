@@ -108,6 +108,10 @@ var float lonFinalHi = na
 var float lonFinalLo = na
 var float nyFinalHi = na
 var float nyFinalLo = na
+var bool asiaSweepHit = false
+var bool sydSweepHit = false
+var bool lonSweepHit = false
+var bool nySweepHit = false
 
 if showSessions and showSessBoxes
     if entered(asiaIn)
@@ -128,6 +132,7 @@ if showSessions and showSessBoxes
             label.new(int(math.round((asiaStart + bar_index) / 2)), (asiaH + asiaL) / 2, 'ASIA', style = label.style_label_center, color = color.new(color.white, 100), textcolor = asiaColor, size = size.large)
             asiaFinalHi := asiaH
             asiaFinalLo := asiaL
+            asiaSweepHit := false
             asiaH := na
             asiaL := na
             asiaStart := na
@@ -151,6 +156,7 @@ if showSessions and showSessBoxes
             label.new(int(math.round((sydStart + bar_index) / 2)), (sydH + sydL) / 2, 'SYDNEY', style = label.style_label_center, color = color.new(color.white, 100), textcolor = sydColor, size = size.large)
             sydFinalHi := sydH
             sydFinalLo := sydL
+            sydSweepHit := false
             sydH := na
             sydL := na
             sydStart := na
@@ -174,6 +180,7 @@ if showSessions and showSessBoxes
             label.new(int(math.round((lonStart + bar_index) / 2)), (lonH + lonL) / 2, 'LONDON', style = label.style_label_center, color = color.new(color.white, 100), textcolor = lonColor, size = size.large)
             lonFinalHi := lonH
             lonFinalLo := lonL
+            lonSweepHit := false
             lonH := na
             lonL := na
             lonStart := na
@@ -197,6 +204,7 @@ if showSessions and showSessBoxes
             label.new(int(math.round((nyStart + bar_index) / 2)), (nyH + nyL) / 2, 'NEW YORK', style = label.style_label_center, color = color.new(color.white, 100), textcolor = nyColor, size = size.large)
             nyFinalHi := nyH
             nyFinalLo := nyL
+            nySweepHit := false
             nyH := na
             nyL := na
             nyStart := na
@@ -326,25 +334,33 @@ asiaLoSweep := dLoSweep
 lonHiSweep := false
 lonLoSweep := false
 
-// Session level sweeps (using finalized session hi/lo)
+// Session level sweeps (using finalized session hi/lo, one sweep per level)
 if showSweep
     sessSweepHi = false
     sessSweepLo = false
-    if not na(asiaFinalHi) and high > asiaFinalHi + swp and close < asiaFinalHi
+    if not asiaSweepHit and not na(asiaFinalHi) and high > asiaFinalHi + swp and close < asiaFinalHi
+        asiaSweepHit := true
         sessSweepHi := true
-    if not na(asiaFinalLo) and low < asiaFinalLo - swp and close > asiaFinalLo
+    if not asiaSweepHit and not na(asiaFinalLo) and low < asiaFinalLo - swp and close > asiaFinalLo
+        asiaSweepHit := true
         sessSweepLo := true
-    if not na(sydFinalHi) and high > sydFinalHi + swp and close < sydFinalHi
+    if not sydSweepHit and not na(sydFinalHi) and high > sydFinalHi + swp and close < sydFinalHi
+        sydSweepHit := true
         sessSweepHi := true
-    if not na(sydFinalLo) and low < sydFinalLo - swp and close > sydFinalLo
+    if not sydSweepHit and not na(sydFinalLo) and low < sydFinalLo - swp and close > sydFinalLo
+        sydSweepHit := true
         sessSweepLo := true
-    if not na(lonFinalHi) and high > lonFinalHi + swp and close < lonFinalHi
+    if not lonSweepHit and not na(lonFinalHi) and high > lonFinalHi + swp and close < lonFinalHi
+        lonSweepHit := true
         sessSweepHi := true
-    if not na(lonFinalLo) and low < lonFinalLo - swp and close > lonFinalLo
+    if not lonSweepHit and not na(lonFinalLo) and low < lonFinalLo - swp and close > lonFinalLo
+        lonSweepHit := true
         sessSweepLo := true
-    if not na(nyFinalHi) and high > nyFinalHi + swp and close < nyFinalHi
+    if not nySweepHit and not na(nyFinalHi) and high > nyFinalHi + swp and close < nyFinalHi
+        nySweepHit := true
         sessSweepHi := true
-    if not na(nyFinalLo) and low < nyFinalLo - swp and close > nyFinalLo
+    if not nySweepHit and not na(nyFinalLo) and low < nyFinalLo - swp and close > nyFinalLo
+        nySweepHit := true
         sessSweepLo := true
     if sessSweepHi
         label.new(bar_index, high, ' SWEEP', color = color.new(#FF5252, 30), style = label.style_label_down, textcolor = color.white, size = size.tiny)
