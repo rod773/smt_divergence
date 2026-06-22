@@ -9,7 +9,7 @@ fvgMinTicks = input.int(8, 'Min FVG Gap (ticks)', minval = 1, maxval = 50)
 fvgNyOnly = input.bool(true, 'FVG only during NY session')
 showIFVG = input.bool(true, 'Show iFVGs')
 showSmt = input.bool(true, 'Show SMT Divergence')
-smtSymbol = input.symbol('MES1!', 'SMT Symbol')
+smtSymbol = input.symbol('BOLDUSD', 'BOLD Symbol')
 showSweep = input.bool(true, 'Show Liquidity Sweeps')
 sweepTicks = input.int(2, 'Sweep Threshold (ticks)', minval = 1, maxval = 20)
 showDol = input.bool(true, 'Show DOL Levels')
@@ -256,53 +256,51 @@ else
     bIFVG := false
     sIFVG := false
 
-// ─── SMT Divergence (with pivot connection lines) ────────────────────────────
-var float pNqLo = na
-var int pNqLoBar = na
-var float pNqHi = na
-var int pNqHiBar = na
-var float pEsLo = na
-var int pEsLoBar = na
-var float pEsHi = na
-var int pEsHiBar = na
+// ─── SMT Divergence AUDUSD vs BOLD (AUDUSD-side lines only) ─────────────────
+var float pAudLo = na
+var int pAudLoBar = na
+var float pAudHi = na
+var int pAudHiBar = na
+var float pBoldLo = na
+var int pBoldLoBar = na
+var float pBoldHi = na
+var int pBoldHiBar = na
 var bSMT = false
 var sSMT = false
 
-nqPl = ta.pivotlow(low, 2, 2)
-nqPh = ta.pivothigh(high, 2, 2)
-esPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
-esPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
+audPl = ta.pivotlow(low, 2, 2)
+audPh = ta.pivothigh(high, 2, 2)
+boldPl = request.security(smtSymbol, timeframe.period, ta.pivotlow(low, 2, 2))
+boldPh = request.security(smtSymbol, timeframe.period, ta.pivothigh(high, 2, 2))
 
 if showSmt
     bSMT := false
     sSMT := false
     
-    eLo = ta.valuewhen(not na(esPl), esPl, 0)
-    eLoBar = ta.valuewhen(not na(esPl), bar_index, 0)
-    eHi = ta.valuewhen(not na(esPh), esPh, 0)
-    eHiBar = ta.valuewhen(not na(esPh), bar_index, 0)
+    bLo = ta.valuewhen(not na(boldPl), boldPl, 0)
+    bLoBar = ta.valuewhen(not na(boldPl), bar_index, 0)
+    bHi = ta.valuewhen(not na(boldPh), boldPh, 0)
+    bHiBar = ta.valuewhen(not na(boldPh), bar_index, 0)
     
-    if not na(nqPl)
-        if not na(pNqLo) and not na(eLo) and nqPl > pNqLo and eLo < pEsLo
+    if not na(audPl)
+        if not na(pAudLo) and not na(bLo) and audPl > pAudLo and bLo < pBoldLo
             bSMT := true
-            line.new(pNqLoBar, pNqLo, bar_index, nqPl, color = cSmtBull, width = 2)
-            line.new(pEsLoBar, pEsLo, eLoBar, eLo, color = cSmtBear, width = 2)
+            line.new(pAudLoBar, pAudLo, bar_index, audPl, color = cSmtBull, width = 2)
             label.new(bar_index, low, ' SMT', color = cSmtBull, style = label.style_label_up, textcolor = color.white, size = size.small)
-        pNqLo := nqPl
-        pNqLoBar := bar_index
-        pEsLo := eLo
-        pEsLoBar := eLoBar
+        pAudLo := audPl
+        pAudLoBar := bar_index
+        pBoldLo := bLo
+        pBoldLoBar := bLoBar
     
-    if not na(nqPh)
-        if not na(pNqHi) and not na(eHi) and nqPh < pNqHi and eHi > pEsHi
+    if not na(audPh)
+        if not na(pAudHi) and not na(bHi) and audPh < pAudHi and bHi > pBoldHi
             sSMT := true
-            line.new(pNqHiBar, pNqHi, bar_index, nqPh, color = cSmtBear, width = 2)
-            line.new(pEsHiBar, pEsHi, eHiBar, eHi, color = cSmtBull, width = 2)
+            line.new(pAudHiBar, pAudHi, bar_index, audPh, color = cSmtBear, width = 2)
             label.new(bar_index, high, ' SMT', color = cSmtBear, style = label.style_label_down, textcolor = color.white, size = size.small)
-        pNqHi := nqPh
-        pNqHiBar := bar_index
-        pEsHi := eHi
-        pEsHiBar := eHiBar
+        pAudHi := audPh
+        pAudHiBar := bar_index
+        pBoldHi := bHi
+        pBoldHiBar := bHiBar
 else
     bSMT := false
     sSMT := false
@@ -382,7 +380,7 @@ if showDol and (not dolNyOnly or inNy)
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
-    lbl = '1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence'
+    lbl = '1. NY session (9:30am est)\n2. Mark out DOLs/FVGs\n3. Entry model (iFVG)\n4. SMT divergence (AUDUSD vs BOLD)'
     label.new(bar_index, high, lbl, color = color.new(#1a1a2e, 30), style = label.style_label_lower_left, textcolor = color.white, size = size.normal)
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
