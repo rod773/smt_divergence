@@ -118,9 +118,9 @@ fvgData(tf) =>
     fresh = ta.change(t) != 0
     [bull, bear, l, h2, l2, h, t, fresh]
 
-[d15b, d15r, l15, h215, l215, h15, t15, n15] = fvgData('15')
-[d1hb, d1hr, l1h, h21h, l21h, h1h, t1h, n1h] = fvgData('60')
-[d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData('240')
+[d15b, d15r, l15, h215, l215, h15, _, n15] = fvgData('15')
+[d1hb, d1hr, l1h, h21h, l21h, h1h, _, n1h] = fvgData('60')
+[d4hb, d4hr, l4h, h24h, l24h, h4h, _, n4h] = fvgData('240')
 
 drawFvgBox(yHi, yLo, c, lbl) =>
     if math.abs(yHi - yLo) >= fvgMinTicks * syminfo.mintick
@@ -142,7 +142,7 @@ if showFvg4h and nyOk and d4hr[1] and n4h
     drawFvgBox(l24h[1], h4h[1], cFvgBear, '4H')
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
-[mHi, mLo, mOp, mCl, mHi1, mLo1] = request.security(syminfo.tickerid, '1', [high, low, open, close, high[1], low[1]])
+[_, _, mOp, mCl, mHi1, mLo1] = request.security(syminfo.tickerid, '1', [high, low, open, close, high[1], low[1]])
 
 bIFVG = mCl < mOp and mCl < mLo1 and close > mHi1
 sIFVG = mCl > mOp and mCl > mHi1 and close < mLo1
