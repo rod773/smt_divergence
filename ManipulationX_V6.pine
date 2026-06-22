@@ -1,5 +1,5 @@
 //@version=5
-indicator("ManipulationX V.6", overlay=true, max_lines_count=500, max_labels_count=300, max_boxes_count=0)
+indicator("ManipulationX V.6", overlay=true, max_lines_count=0, max_labels_count=300, max_boxes_count=500)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 showFvg15   = input.bool(true,  "Show 15m FVG")
@@ -33,7 +33,7 @@ lonSess = time(timeframe.period, "0300-1200", "America/New_York")
 lonKz = showKz and not na(lonSess)
 bgcolor(lonKz ? cKzLon : na)
 
-// ─── HTF FVG (linefill = TradingView rectangle style) ────────────────────────
+// ─── HTF FVG (box tool style) ───────────────────────────────────────────────
 fvgData(tf) =>
     [h, l, h2, l2, t] = request.security(syminfo.tickerid, tf, [high, low, high[2], low[2], time])
     bull = l > h2
@@ -45,25 +45,23 @@ fvgData(tf) =>
 [d1hb, d1hr, l1h, h21h, l21h, h1h, t1h, n1h] = fvgData("60")
 [d4hb, d4hr, l4h, h24h, l24h, h4h, t4h, n4h] = fvgData("240")
 
-drawFvgZone(yHi, yLo, c, lbl) =>
-    l1 = line.new(bar_index, yHi, bar_index, yHi, extend=extend.right, color=c, width=1)
-    l2 = line.new(bar_index, yLo, bar_index, yLo, extend=extend.right, color=c, width=1)
-    linefill.new(l1, l2, color.new(c, 80))
+drawFvgBox(yHi, yLo, c, lbl) =>
+    box.new(bar_index, yHi, bar_index + 50, yLo, border_color=c, bgcolor=color.new(c, 80))
     label.new(bar_index, (yHi + yLo) / 2, lbl, color=color.new(c, 50),
      style=label.style_label_center, textcolor=color.white, size=size.tiny)
 
 if showFvg15 and d15b[1] and n15
-    drawFvgZone(l15[1], h215[1], cFvgBull, "15M")
+    drawFvgBox(l15[1], h215[1], cFvgBull, "15M")
 if showFvg15 and d15r[1] and n15
-    drawFvgZone(l215[1], h15[1], cFvgBear, "15M")
+    drawFvgBox(l215[1], h15[1], cFvgBear, "15M")
 if showFvg1h and d1hb[1] and n1h
-    drawFvgZone(l1h[1], h21h[1], cFvgBull, "1H")
+    drawFvgBox(l1h[1], h21h[1], cFvgBull, "1H")
 if showFvg1h and d1hr[1] and n1h
-    drawFvgZone(l21h[1], h1h[1], cFvgBear, "1H")
+    drawFvgBox(l21h[1], h1h[1], cFvgBear, "1H")
 if showFvg4h and d4hb[1] and n4h
-    drawFvgZone(l4h[1], h24h[1], cFvgBull, "4H")
+    drawFvgBox(l4h[1], h24h[1], cFvgBull, "4H")
 if showFvg4h and d4hr[1] and n4h
-    drawFvgZone(l24h[1], h4h[1], cFvgBear, "4H")
+    drawFvgBox(l24h[1], h4h[1], cFvgBear, "4H")
 
 // ─── IFVG (1m) ───────────────────────────────────────────────────────────────
 [mHi, mLo, mOp, mCl] = request.security(syminfo.tickerid, "1", [high, low, open, close])
@@ -125,23 +123,16 @@ if showDol
         label.new(bar_index, low, "DOL", color=cDol,
          style=label.style_label_up, textcolor=color.white, size=size.tiny)
 
-// ─── S/R Levels (solid horizontal rays, max 40) ──────────────────────────────
-var line[] srLines = array.new_line()
-drawSrRay(px) =>
-    l = line.new(bar_index, px, bar_index, px, extend=extend.right,
-     color=color.new(#FFD600, 20), width=2)
-    array.push(srLines, l)
-    if array.size(srLines) > 40
-        l2 = array.shift(srLines)
-        line.delete(l2)
-
+// ─── S/R Levels (thin boxes at pivots) ───────────────────────────────────────
 if showSr
     srHi = ta.pivothigh(high, 3, 3)
     srLo = ta.pivotlow(low, 3, 3)
     if not na(srHi)
-        drawSrRay(srHi)
+        box.new(bar_index, srHi, bar_index + 50, srHi - syminfo.mintick * 2,
+         border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
     if not na(srLo)
-        drawSrRay(srLo)
+        box.new(bar_index, srLo + syminfo.mintick * 2, bar_index + 50, srLo,
+         border_color=color.new(#FFD600, 50), bgcolor=color.new(#FFD600, 70))
 
 // ─── Checklist ───────────────────────────────────────────────────────────────
 if barstate.islast
