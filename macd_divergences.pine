@@ -31,7 +31,7 @@ donttouchzero = input(title = 'Don\'t touch the zero line?', defval = true)
 lbR = input(title = 'Pivot Lookback Right', defval = 5)
 lbL = input(title = 'Pivot Lookback Left', defval = 5)
 rangeUpper = input(title = 'Max of Lookback Range', defval = 60)
-rangeLower = input(title = 'Min of Lookback Range', defval = 5)
+rangeLower = input(title = 'Min of Lookback Range', defval = 1)
 plotBull = input(title = 'Plot Bullish', defval = true)
 plotHiddenBull = false
 plotBear = input(title = 'Plot Bearish', defval = true)

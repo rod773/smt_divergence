@@ -50,7 +50,7 @@ for i in range(lbR, len(df)):
         for j in range(i-1, max(0, i-60), -1):
             if not np.isnan(df["macdPl"].iloc[j]):
                 prev_idx = j; break
-        if prev_idx is not None and (i - prev_idx) <= 60:
+        if prev_idx is not None and 1 <= (i - prev_idx) <= 60:
             price_ll = df["Low"].iloc[i] < df["Low"].iloc[prev_idx]
             macd_hl = df["macd"].iloc[i] > df["macd"].iloc[prev_idx]
             below_zero = df["macd"].iloc[i] < 0
@@ -63,7 +63,7 @@ for i in range(lbR, len(df)):
         for j in range(i-1, max(0, i-60), -1):
             if not np.isnan(df["macdPh"].iloc[j]):
                 prev_idx = j; break
-        if prev_idx is not None and (i - prev_idx) <= 60:
+        if prev_idx is not None and 1 <= (i - prev_idx) <= 60:
             price_hh = df["High"].iloc[i] > df["High"].iloc[prev_idx]
             macd_lh = df["macd"].iloc[i] < df["macd"].iloc[prev_idx]
             above_zero = df["macd"].iloc[i] > 0
